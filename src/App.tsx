@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Learn from "./pages/Learn";
 import ToolPage from "./pages/ToolPage";
+import GitCourse from "./pages/GitCourse";
 import BugCreate from "./pages/BugCreate";
 import BugDetail from "./pages/BugDetail";
 import BugList from "./pages/BugList";
