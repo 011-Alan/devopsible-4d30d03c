@@ -51,7 +51,7 @@ const Landing = () => {
         <div className="mx-auto flex h-[56px] max-w-[1200px] items-center justify-between">
           <Link to="/" className="flex items-center gap-2 -ml-0.5">
             <StackedLogo size={16} />
-            <span className="text-[14px] font-bold text-foreground tracking-[0.08em] uppercase">Triage</span>
+            <span className="text-[14px] font-bold text-foreground tracking-[0.08em] uppercase">DevOpsible</span>
           </Link>
           <div className="flex items-center gap-2">
             <button
@@ -84,15 +84,15 @@ const Landing = () => {
             {/* Left column — text */}
             <div className="relative z-[3] flex-1 min-w-0 max-w-[540px]">
               <h1 className="text-[clamp(2rem,4vw,3.2rem)] font-[500] leading-[1.08] tracking-[-0.04em] text-foreground max-w-[540px]">
-                Bug tracking for teams that ship fast
+                Learn the DevOps toolchain, one tool at a time
               </h1>
               <p className="mt-6 text-base leading-relaxed text-muted-foreground max-w-[420px]">
-                Purpose-built for engineering teams. Triage, track, and resolve issues without slowing down.
+                Git, Jenkins, Docker, Kubernetes, Ansible and Terraform — concepts, real commands and a practice task for each. No fluff.
               </p>
               <div className="mt-10 flex items-center gap-4">
                 <Link to="/auth">
                   <button className="group relative inline-flex items-center gap-2 px-6 py-3 text-[14px] font-medium bg-foreground text-background transition-all duration-200 hover:bg-foreground/90">
-                    Get started free
+                    Start learning free
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </button>
                 </Link>
@@ -148,13 +148,13 @@ const Landing = () => {
                   </div>
                   <div className="flex-1">
                     {[
-                      { priority: "bg-destructive", id: "TRG-142", title: "w-[180px]", status: "bg-warning" },
-                      { priority: "bg-destructive", id: "TRG-139", title: "w-[220px]", status: "bg-destructive" },
-                      { priority: "bg-warning", id: "TRG-138", title: "w-[160px]", status: "bg-primary" },
-                      { priority: "bg-primary", id: "TRG-135", title: "w-[200px]", status: "bg-success" },
-                      { priority: "bg-muted-foreground/30", id: "TRG-131", title: "w-[140px]", status: "bg-primary" },
-                      { priority: "bg-warning", id: "TRG-128", title: "w-[190px]", status: "bg-warning" },
-                      { priority: "bg-primary", id: "TRG-125", title: "w-[170px]", status: "bg-success" },
+                      { priority: "bg-destructive", id: "GIT", title: "w-[180px]", status: "bg-warning" },
+                      { priority: "bg-destructive", id: "JENKINS", title: "w-[220px]", status: "bg-destructive" },
+                      { priority: "bg-warning", id: "DOCKER", title: "w-[160px]", status: "bg-primary" },
+                      { priority: "bg-primary", id: "K8S", title: "w-[200px]", status: "bg-success" },
+                      { priority: "bg-muted-foreground/30", id: "ANSIBLE", title: "w-[140px]", status: "bg-primary" },
+                      { priority: "bg-warning", id: "TERRAFORM", title: "w-[190px]", status: "bg-warning" },
+                      { priority: "bg-primary", id: "CI/CD", title: "w-[170px]", status: "bg-success" },
                     ].map((row, i) => (
                       <div key={i} className={`relative flex items-center gap-3 px-4 h-9 border-b border-border transition-colors`}>
                         {i === 1 && (
@@ -232,28 +232,28 @@ const Landing = () => {
       <section className="relative z-10 pt-24 pb-24 px-6 overflow-hidden">
         <div className="mx-auto max-w-[1200px] relative">
           <p className="text-[13px] uppercase tracking-[0.15em] text-muted-foreground mb-4">
-            Built for speed
+            Built for practitioners
           </p>
           <h2 className="text-[clamp(1.8rem,3vw,2.5rem)] font-[500] tracking-[-0.03em] text-foreground max-w-[500px] leading-[1.15]">
-            Less process.<br />More progress.
+            Less theory.<br />More shipping.
           </h2>
 
           <div className="mt-16 border border-border">
             <div className="grid grid-cols-1 md:grid-cols-3">
               {[
                 {
-                  title: "Priority triage",
-                  desc: "Four severity levels. SLA deadlines. One glance tells you what to fix next — and when you're out of time.",
+                  title: "Six core tools",
+                  desc: "Source control, CI/CD, containers, orchestration, configuration and provisioning — the stack every DevOps role expects.",
                   graphic: "bars",
                 },
                 {
-                  title: "Team workflows",
-                  desc: "Assign, reassign, comment, resolve. Every state change leaves a trail. Nothing slips through.",
+                  title: "Copy-paste commands",
+                  desc: "Every page ships with the real commands and manifests you'll type on the job. Nothing hand-waved.",
                   graphic: "flow",
                 },
                 {
-                  title: "Real-time analytics",
-                  desc: "Resolution time. Severity trends. Team velocity. Numbers that tell you something — not dashboards for dashboards' sake.",
+                  title: "A task per tool",
+                  desc: "End each page with a hands-on exercise you can finish in an afternoon. Learning sticks when you build.",
                   graphic: "chart",
                 },
               ].map((feature, i) => (
@@ -331,13 +331,13 @@ const Landing = () => {
         <div className="mx-auto max-w-[1200px] relative">
           <div className="border border-border bg-background p-10 max-w-[720px] mx-auto">
             <blockquote className="text-[20px] font-[400] leading-[1.5] tracking-[-0.01em] text-foreground/85">
-              "We replaced three tools with one. Mean time to resolution dropped 40% in the first month. The team actually uses it — that's the real win."
+              "I went from 'what even is a pod' to deploying with Terraform and Kubernetes in a month. Short pages, real commands, an exercise every time."
             </blockquote>
             <div className="mt-6 flex items-center gap-3">
               <img src={testimonialAvatarAsset.url} alt="Jamie Kim" className="h-8 w-8 rounded-full object-cover" />
               <div>
                 <span className="text-[13px] font-medium text-foreground">Jamie Kim</span>
-                <span className="text-[13px] text-muted-foreground ml-2">Engineering Lead, Acme Corp</span>
+                <span className="text-[13px] text-muted-foreground ml-2">Platform Engineer, Acme Corp</span>
               </div>
             </div>
           </div>
@@ -351,17 +351,17 @@ const Landing = () => {
       <section className="relative z-10 pt-32 pb-40 px-6 overflow-hidden">
         <div className="mx-auto max-w-[1200px] text-center relative">
           <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-[500] tracking-[-0.035em] text-foreground leading-[1.1] mx-auto max-w-[560px]">
-            Your bugs aren't going to track themselves.
+            The toolchain isn't going to learn itself.
           </h2>
           <p className="mt-5 text-[15px] text-muted-foreground max-w-[400px] mx-auto">
-            Two minutes to set up. No credit card. No sales call.<br />Just fewer bugs, starting now.
+            Sign in with Google or email. No credit card.<br />Six tools, waiting for you.
           </p>
           <div className="mt-10 flex justify-center">
             <Link to="/auth">
               <button
                 className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 text-[15px] font-medium transition-all duration-200 border border-foreground/40 text-foreground hover:bg-foreground hover:text-background hover:border-foreground"
               >
-                Start tracking now
+                Start learning now
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </button>
             </Link>
@@ -374,7 +374,7 @@ const Landing = () => {
         <div className="mx-auto max-w-[1200px] px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-2 -ml-0.5">
             <StackedLogo size={16} />
-            <span className="text-[12px] font-bold text-foreground uppercase tracking-[0.08em]">Triage</span>
+            <span className="text-[12px] font-bold text-foreground uppercase tracking-[0.08em]">DevOpsible</span>
           </div>
           <span className="text-[12px] text-muted-foreground">© {new Date().getFullYear()}</span>
         </div>

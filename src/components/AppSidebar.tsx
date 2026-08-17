@@ -1,7 +1,6 @@
-import { LayoutDashboard, Plus, Bug, BarChart3, Settings, LogOut, Search } from "lucide-react";
+import { GraduationCap, LayoutDashboard, Plus, Bug, BarChart3, Settings, LogOut } from "lucide-react";
 import { StackedLogo } from "./StackedLogo";
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -9,7 +8,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
 export const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: GraduationCap, label: "Learn", path: "/dashboard" },
+  { icon: LayoutDashboard, label: "Overview", path: "/overview" },
   { icon: Plus, label: "Report Bug", path: "/bugs/new" },
   { icon: Bug, label: "All Bugs", path: "/bugs" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
@@ -31,7 +31,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
         <StackedLogo size={16} color="currentColor" />
         {!collapsed && (
           <span className="font-bold uppercase tracking-[0.08em] text-[14px] text-sidebar-accent-foreground">
-            Triage
+            DevOpsible
           </span>
         )}
       </div>
