@@ -35,7 +35,9 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="/dashboard" element={<ProtectedRoute><Learn /></ProtectedRoute>} />
+              <Route path="/learn/git" element={<ProtectedRoute><GitCourse /></ProtectedRoute>} />
               <Route path="/learn/:slug" element={<ProtectedRoute><ToolPage /></ProtectedRoute>} />
+
               <Route path="/overview" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/bugs" element={<ProtectedRoute><BugList /></ProtectedRoute>} />
               <Route path="/bugs/new" element={<ProtectedRoute><BugCreate /></ProtectedRoute>} />
