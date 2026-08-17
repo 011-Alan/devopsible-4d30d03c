@@ -84,15 +84,15 @@ const Landing = () => {
             {/* Left column — text */}
             <div className="relative z-[3] flex-1 min-w-0 max-w-[540px]">
               <h1 className="text-[clamp(2rem,4vw,3.2rem)] font-[500] leading-[1.08] tracking-[-0.04em] text-foreground max-w-[540px]">
-                Bug tracking for teams that ship fast
+                Learn the DevOps toolchain, one tool at a time
               </h1>
               <p className="mt-6 text-base leading-relaxed text-muted-foreground max-w-[420px]">
-                Purpose-built for engineering teams. DevOpsible, track, and resolve issues without slowing down.
+                Git, Jenkins, Docker, Kubernetes, Ansible and Terraform — concepts, real commands and a practice task for each. No fluff.
               </p>
               <div className="mt-10 flex items-center gap-4">
                 <Link to="/auth">
                   <button className="group relative inline-flex items-center gap-2 px-6 py-3 text-[14px] font-medium bg-foreground text-background transition-all duration-200 hover:bg-foreground/90">
-                    Get started free
+                    Start learning free
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </button>
                 </Link>
@@ -232,28 +232,28 @@ const Landing = () => {
       <section className="relative z-10 pt-24 pb-24 px-6 overflow-hidden">
         <div className="mx-auto max-w-[1200px] relative">
           <p className="text-[13px] uppercase tracking-[0.15em] text-muted-foreground mb-4">
-            Built for speed
+            Built for practitioners
           </p>
           <h2 className="text-[clamp(1.8rem,3vw,2.5rem)] font-[500] tracking-[-0.03em] text-foreground max-w-[500px] leading-[1.15]">
-            Less process.<br />More progress.
+            Less theory.<br />More shipping.
           </h2>
 
           <div className="mt-16 border border-border">
             <div className="grid grid-cols-1 md:grid-cols-3">
               {[
                 {
-                  title: "Priority triage",
-                  desc: "Four severity levels. SLA deadlines. One glance tells you what to fix next — and when you're out of time.",
+                  title: "Six core tools",
+                  desc: "Source control, CI/CD, containers, orchestration, configuration and provisioning — the stack every DevOps role expects.",
                   graphic: "bars",
                 },
                 {
-                  title: "Team workflows",
-                  desc: "Assign, reassign, comment, resolve. Every state change leaves a trail. Nothing slips through.",
+                  title: "Copy-paste commands",
+                  desc: "Every page ships with the real commands and manifests you'll type on the job. Nothing hand-waved.",
                   graphic: "flow",
                 },
                 {
-                  title: "Real-time analytics",
-                  desc: "Resolution time. Severity trends. Team velocity. Numbers that tell you something — not dashboards for dashboards' sake.",
+                  title: "A task per tool",
+                  desc: "End each page with a hands-on exercise you can finish in an afternoon. Learning sticks when you build.",
                   graphic: "chart",
                 },
               ].map((feature, i) => (
