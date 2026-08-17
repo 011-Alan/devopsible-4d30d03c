@@ -9,6 +9,8 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import Learn from "./pages/Learn";
+import ToolPage from "./pages/ToolPage";
 import BugCreate from "./pages/BugCreate";
 import BugDetail from "./pages/BugDetail";
 import BugList from "./pages/BugList";
@@ -31,7 +33,9 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={<Index />} />
               <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><Learn /></ProtectedRoute>} />
+              <Route path="/learn/:slug" element={<ProtectedRoute><ToolPage /></ProtectedRoute>} />
+              <Route path="/overview" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/bugs" element={<ProtectedRoute><BugList /></ProtectedRoute>} />
               <Route path="/bugs/new" element={<ProtectedRoute><BugCreate /></ProtectedRoute>} />
               <Route path="/bugs/:id" element={<ProtectedRoute><BugDetail /></ProtectedRoute>} />
