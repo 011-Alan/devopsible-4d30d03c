@@ -51,7 +51,7 @@ const Landing = () => {
         <div className="mx-auto flex h-[56px] max-w-[1200px] items-center justify-between">
           <Link to="/" className="flex items-center gap-2 -ml-0.5">
             <StackedLogo size={16} />
-            <span className="text-[14px] font-bold text-foreground tracking-[0.08em] uppercase">Triage</span>
+            <span className="text-[14px] font-bold text-foreground tracking-[0.08em] uppercase">DevOpsible</span>
           </Link>
           <div className="flex items-center gap-2">
             <button
@@ -87,7 +87,7 @@ const Landing = () => {
                 Bug tracking for teams that ship fast
               </h1>
               <p className="mt-6 text-base leading-relaxed text-muted-foreground max-w-[420px]">
-                Purpose-built for engineering teams. Triage, track, and resolve issues without slowing down.
+                Purpose-built for engineering teams. DevOpsible, track, and resolve issues without slowing down.
               </p>
               <div className="mt-10 flex items-center gap-4">
                 <Link to="/auth">
@@ -374,7 +374,7 @@ const Landing = () => {
         <div className="mx-auto max-w-[1200px] px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-2 -ml-0.5">
             <StackedLogo size={16} />
-            <span className="text-[12px] font-bold text-foreground uppercase tracking-[0.08em]">Triage</span>
+            <span className="text-[12px] font-bold text-foreground uppercase tracking-[0.08em]">DevOpsible</span>
           </div>
           <span className="text-[12px] text-muted-foreground">© {new Date().getFullYear()}</span>
         </div>
