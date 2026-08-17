@@ -86,7 +86,7 @@ export default function Auth() {
             <StackedLogo size={16} />
             <span className="text-[14px] font-bold text-foreground tracking-[0.08em] uppercase">DevOpsible</span>
           </Link>
-          <p className="text-[13px] text-muted-foreground">Track, prioritize, and resolve bugs</p>
+          <p className="text-[13px] text-muted-foreground">Learn the DevOps toolchain, hands-on</p>
         </div>
 
         {/* Google */}

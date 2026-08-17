@@ -148,13 +148,13 @@ const Landing = () => {
                   </div>
                   <div className="flex-1">
                     {[
-                      { priority: "bg-destructive", id: "TRG-142", title: "w-[180px]", status: "bg-warning" },
-                      { priority: "bg-destructive", id: "TRG-139", title: "w-[220px]", status: "bg-destructive" },
-                      { priority: "bg-warning", id: "TRG-138", title: "w-[160px]", status: "bg-primary" },
-                      { priority: "bg-primary", id: "TRG-135", title: "w-[200px]", status: "bg-success" },
-                      { priority: "bg-muted-foreground/30", id: "TRG-131", title: "w-[140px]", status: "bg-primary" },
-                      { priority: "bg-warning", id: "TRG-128", title: "w-[190px]", status: "bg-warning" },
-                      { priority: "bg-primary", id: "TRG-125", title: "w-[170px]", status: "bg-success" },
+                      { priority: "bg-destructive", id: "GIT", title: "w-[180px]", status: "bg-warning" },
+                      { priority: "bg-destructive", id: "JENKINS", title: "w-[220px]", status: "bg-destructive" },
+                      { priority: "bg-warning", id: "DOCKER", title: "w-[160px]", status: "bg-primary" },
+                      { priority: "bg-primary", id: "K8S", title: "w-[200px]", status: "bg-success" },
+                      { priority: "bg-muted-foreground/30", id: "ANSIBLE", title: "w-[140px]", status: "bg-primary" },
+                      { priority: "bg-warning", id: "TERRAFORM", title: "w-[190px]", status: "bg-warning" },
+                      { priority: "bg-primary", id: "CI/CD", title: "w-[170px]", status: "bg-success" },
                     ].map((row, i) => (
                       <div key={i} className={`relative flex items-center gap-3 px-4 h-9 border-b border-border transition-colors`}>
                         {i === 1 && (
