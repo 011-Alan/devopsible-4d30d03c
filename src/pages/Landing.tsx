@@ -331,13 +331,13 @@ const Landing = () => {
         <div className="mx-auto max-w-[1200px] relative">
           <div className="border border-border bg-background p-10 max-w-[720px] mx-auto">
             <blockquote className="text-[20px] font-[400] leading-[1.5] tracking-[-0.01em] text-foreground/85">
-              "We replaced three tools with one. Mean time to resolution dropped 40% in the first month. The team actually uses it — that's the real win."
+              "I went from 'what even is a pod' to deploying with Terraform and Kubernetes in a month. Short pages, real commands, an exercise every time."
             </blockquote>
             <div className="mt-6 flex items-center gap-3">
               <img src={testimonialAvatarAsset.url} alt="Jamie Kim" className="h-8 w-8 rounded-full object-cover" />
               <div>
                 <span className="text-[13px] font-medium text-foreground">Jamie Kim</span>
-                <span className="text-[13px] text-muted-foreground ml-2">Engineering Lead, Acme Corp</span>
+                <span className="text-[13px] text-muted-foreground ml-2">Platform Engineer, Acme Corp</span>
               </div>
             </div>
           </div>
@@ -351,17 +351,17 @@ const Landing = () => {
       <section className="relative z-10 pt-32 pb-40 px-6 overflow-hidden">
         <div className="mx-auto max-w-[1200px] text-center relative">
           <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-[500] tracking-[-0.035em] text-foreground leading-[1.1] mx-auto max-w-[560px]">
-            Your bugs aren't going to track themselves.
+            The toolchain isn't going to learn itself.
           </h2>
           <p className="mt-5 text-[15px] text-muted-foreground max-w-[400px] mx-auto">
-            Two minutes to set up. No credit card. No sales call.<br />Just fewer bugs, starting now.
+            Sign in with Google or email. No credit card.<br />Six tools, waiting for you.
           </p>
           <div className="mt-10 flex justify-center">
             <Link to="/auth">
               <button
                 className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 text-[15px] font-medium transition-all duration-200 border border-foreground/40 text-foreground hover:bg-foreground hover:text-background hover:border-foreground"
               >
-                Start tracking now
+                Start learning now
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </button>
             </Link>
