@@ -25,7 +25,7 @@ export function reconcile(s: K8sState): K8sState {
   const pods: Pod[] = s.pods.filter((p) => !p.app || !s.deployments.some((d) => d.name === p.app && d.ns === p.ns) ? !p.app : true);
   const out: Pod[] = pods.filter((p) => !s.deployments.some((d) => d.name === p.app && d.ns === p.ns));
   for (const d of s.deployments) {
-    const status = GOOD_IMAGES.test(d.image) ? "Running" : "ImagePullBackOff";
+    const status: Pod["status"] = GOOD_IMAGES.test(d.image) ? "Running" : "ImagePullBackOff";
     const mine = s.pods.filter((p) => p.app === d.name && p.ns === d.ns && p.image === d.image);
     const keep = mine.slice(0, d.replicas);
     while (keep.length < d.replicas) keep.push({ name: `${d.name}-${rand()}${rand()}`.slice(0, d.name.length + 11), app: d.name, image: d.image, status, ns: d.ns });
