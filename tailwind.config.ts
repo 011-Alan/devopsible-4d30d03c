@@ -43,6 +43,9 @@ export default {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        xp: {
+          DEFAULT: "hsl(var(--xp))",
+        },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
@@ -78,6 +81,7 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        mono: ["Geist Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       fontSize: {
         "2xs": ["0.6875rem", { lineHeight: "1rem" }],
