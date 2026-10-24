@@ -1,102 +1,99 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { AppLayout } from "@/components/AppLayout";
+import { Link, useSearchParams } from "react-router-dom";
+import { LabLayout } from "@/components/layout/LabLayout";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { levels, rankFor, xpAfterHints, type Level, type Mission } from "@/lib/git-sim/levels";
+import { levels, type Level, type Mission } from "@/lib/git-sim/levels";
 import { runCommand, commitList, type RepoState } from "@/lib/git-sim/engine";
+import { useUserProgress } from "@/lib/progress";
 import {
   ArrowLeft,
   BookOpen,
   Check,
+  CheckCircle2,
   ChevronRight,
   FileCode,
   GitBranch,
-  Lightbulb,
+  HelpCircle,
   Lock,
+  Play,
   RotateCcw,
   Terminal as TerminalIcon,
   Trophy,
 } from "lucide-react";
 
-type Progress = {
-  xp: number;
-  completed: Record<string, number>; // missionId -> xp awarded
-  badges: string[];
-};
-
-const STORAGE_KEY = "devopsible.git.progress";
-
-function loadProgress(): Progress {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    /* ignore */
-  }
-  return { xp: 0, completed: {}, badges: [] };
-}
-
 type Line = { text: string; kind: "cmd" | "out" | "err" | "sys" };
 
 export default function GitCourse() {
-  const [progress, setProgress] = useState<Progress>(loadProgress);
-  const [levelId, setLevelId] = useState(1);
-  const level = levels.find((l) => l.id === levelId)!;
+  const [searchParams] = useSearchParams();
+  const initialLevelId = parseInt(searchParams.get("level") || "1", 10);
+  const { progress, awardLevelCompletion } = useUserProgress();
 
-  const [mode, setMode] = useState<"learn" | "practice" | "mission">("learn");
+  const [levelId, setLevelId] = useState(initialLevelId);
+  const level = levels.find((l) => l.id === levelId) || levels[0];
+
+  const [mode, setMode] = useState<"learn" | "practice" | "mission">("mission");
   const [repo, setRepo] = useState<RepoState>(() => level.setup());
   const [history, setHistory] = useState<string[]>([]);
-  const [lines, setLines] = useState<Line[]>([{ text: "Sandbox ready. Type `help` to see what you can run.", kind: "sys" }]);
+  const [lines, setLines] = useState<Line[]>([
+    { text: "DevOpsible Git Sandbox environment ready.", kind: "sys" },
+    { text: `Level ${level.id} — ${level.title}`, kind: "sys" },
+    { text: "Type `help` to list commands. Inspect state in the file panel and commit graph.", kind: "sys" },
+  ]);
   const [input, setInput] = useState("");
-  const [openFile, setOpenFile] = useState<string | null>(null);
+  const [openFile, setOpenFile] = useState<string | null>("app.js");
+  const [fileContent, setFileContent] = useState<string>("");
   const [hintsUsed, setHintsUsed] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"terminal" | "files" | "graph">("terminal");
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-  }, [progress]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [lines]);
 
+  useEffect(() => {
+    if (openFile && repo.workingTree[openFile] !== undefined) {
+      setFileContent(repo.workingTree[openFile] || "");
+    } else {
+      const first = Object.keys(repo.workingTree)[0];
+      if (first) {
+        setOpenFile(first);
+        setFileContent(repo.workingTree[first] || "");
+      }
+    }
+  }, [repo.workingTree, openFile]);
+
   const resetLab = (l: Level = level) => {
     setRepo(l.setup());
     setHistory([]);
-    setOpenFile(null);
-    setLines([{ text: `Golden snapshot restored for Level ${l.id} — ${l.title}.`, kind: "sys" }]);
+    setLines([
+      { text: "DevOpsible Git Sandbox environment ready.", kind: "sys" },
+      { text: `Level ${l.id} — ${l.title}`, kind: "sys" },
+      { text: "Sandbox restored to golden snapshot.", kind: "sys" },
+    ]);
   };
 
   const selectLevel = (l: Level) => {
     if (!l.available) return;
     setLevelId(l.id);
-    setMode("learn");
     resetLab(l);
   };
 
-  const award = (mission: Mission) => {
-    if (progress.completed[mission.id]) return;
-    const xp = xpAfterHints(mission.xp, hintsUsed[mission.id] ?? 0);
-    setProgress((p) => {
-      const completed = { ...p.completed, [mission.id]: xp };
-      const levelDone = level.missions.every((m) => completed[m.id]);
-      return {
-        xp: p.xp + xp + (levelDone ? 250 : 0),
-        completed,
-        badges: levelDone && !p.badges.includes(level.badge) ? [...p.badges, level.badge] : p.badges,
-      };
-    });
-    setToast(`+${xp} XP — ${mission.title}`);
-    setLines((ls) => [...ls, { text: `✓ ${mission.done}  (+${xp} XP)`, kind: "sys" }]);
-    setTimeout(() => setToast(null), 3200);
+  const award = (m: Mission) => {
+    const isDone = progress.git?.levels[level.id]?.status === "completed";
+    awardLevelCompletion("git", level.id, m.xp, level.badge);
+    setToast(`+${m.xp} XP — ${m.title}`);
+    setLines((ls) => [...ls, { text: `✓ ${m.done}  (+${m.xp} XP)`, kind: "sys" }]);
+    setTimeout(() => setToast(null), 3500);
   };
 
   const check = (state: RepoState, log: string[]) => {
     for (const m of level.missions) {
-      if (!progress.completed[m.id] && m.validate(state, log)) award(m);
+      if (m.validate(state, log)) {
+        award(m);
+      }
     }
   };
 
@@ -117,312 +114,395 @@ export default function GitCourse() {
       ]);
     }
     check(state, log);
+    setInput("");
   };
 
   const saveFile = (path: string, content: string) => {
     const next = { ...repo, workingTree: { ...repo.workingTree, [path]: content } };
     setRepo(next);
     check(next, history);
+    setToast(`Saved ${path}`);
+    setTimeout(() => setToast(null), 2000);
   };
 
-  const createFile = () => {
-    const name = window.prompt("New file path", "src/payment.js");
-    if (!name) return;
-    const next = { ...repo, workingTree: { ...repo.workingTree, [name]: "" } };
-    setRepo(next);
-    setOpenFile(name);
-    check(next, history);
-  };
-
-  const { current: rank, next: nextRank } = rankFor(progress.xp);
-  const rankPct = nextRank ? Math.round(((progress.xp - rank.xp) / (nextRank.xp - rank.xp)) * 100) : 100;
-  const levelMissionsDone = level.missions.filter((m) => progress.completed[m.id]).length;
   const commits = useMemo(() => commitList(repo), [repo]);
   const branch = repo.detached ? `HEAD@${repo.detached}` : repo.head;
+  const levelState = progress.git?.levels[level.id] || { status: "in_progress", earnedXp: 0 };
+  const isLevelCompleted = levelState.status === "completed";
 
   return (
-    <AppLayout>
-      <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="h-3.5 w-3.5" /> All tools
-          </Link>
-          <div className="flex items-center gap-4 text-[12px]">
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <Trophy className="h-3.5 w-3.5" /> {progress.xp.toLocaleString()} XP
-            </span>
-            <span className="text-foreground font-medium">{rank.name}</span>
-            <div className="hidden sm:block h-1 w-32 bg-muted overflow-hidden rounded-full">
-              <div className="h-full bg-primary transition-all" style={{ width: `${rankPct}%` }} />
-            </div>
-            {nextRank && <span className="hidden sm:inline text-muted-foreground">next: {nextRank.name}</span>}
+    <LabLayout>
+      <div className="flex-1 flex flex-col h-[calc(100vh-60px)] overflow-hidden bg-[#070b13]">
+        {/* Toast notification */}
+        {toast && (
+          <div className="fixed top-16 right-6 z-50 px-4 py-2.5 rounded-xl bg-orange-950/90 border border-orange-500/50 text-orange-200 font-mono text-xs shadow-xl animate-fade-in flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            {toast}
           </div>
-        </div>
+        )}
 
-        <header className="mt-5 pb-5 border-b border-border">
-          <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Course</p>
-          <h1 className="mt-2 text-[26px] font-[500] tracking-[-0.02em] leading-tight">Git Yourself Up</h1>
-          <p className="mt-2 text-[14px] text-muted-foreground max-w-[620px]">
-            You're a junior engineer at Nexa. Twelve levels, one story: from your first day in the repo to shipping a
-            tagged release. Every challenge is validated by inspecting the repository, not the commands you typed.
-          </p>
-        </header>
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Left Column: Mission Briefing & Levels */}
+          <div className="w-full lg:w-[420px] shrink-0 border-r border-[#1a263e] bg-[#090f1d] flex flex-col overflow-y-auto p-6 space-y-6">
+            <Link
+              to="/learn/git"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back to Git Flow
+            </Link>
 
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-[210px_1fr] gap-6">
-          {/* Level rail */}
-          <aside className="space-y-px">
-            {levels.map((l) => {
-              const done = l.missions.length > 0 && l.missions.every((m) => progress.completed[m.id]);
-              return (
-                <button
-                  key={l.id}
-                  onClick={() => selectLevel(l)}
-                  disabled={!l.available}
-                  className={`w-full text-left px-3 py-2.5 border border-border flex items-center gap-2.5 transition-colors ${
-                    l.id === levelId ? "bg-accent" : l.available ? "hover:bg-accent/50" : "opacity-45 cursor-not-allowed"
-                  }`}
-                >
-                  <span className="text-[14px]">{l.emoji}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Level {l.id}</span>
-                    <span className="block text-[12.5px] font-medium truncate">{l.title}</span>
+            {/* Level Title & Selector */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-orange-400 font-bold">
+                  LEVEL {String(level.id).padStart(2, "0")} · {level.role}
+                </span>
+                {isLevelCompleted && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800">
+                    COMPLETED
                   </span>
-                  {done ? <Check className="h-3.5 w-3.5 text-primary" /> : !l.available ? <Lock className="h-3 w-3 text-muted-foreground" /> : null}
-                </button>
-              );
-            })}
-            {progress.badges.length > 0 && (
-              <div className="pt-4">
-                <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">Badges</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {progress.badges.map((b) => (
-                    <span key={b} className="text-[11px] border border-border px-2 py-1">{b}</span>
-                  ))}
+                )}
+              </div>
+
+              <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                <span>{level.emoji}</span>
+                <span>{level.title}</span>
+              </h1>
+              <p className="text-xs text-slate-300 leading-relaxed">{level.story}</p>
+            </div>
+
+            {/* Mode Selector Tabs */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-[#0d1526] border border-[#1d2a45]">
+              <button
+                onClick={() => setMode("mission")}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  mode === "mission" ? "bg-orange-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Missions
+              </button>
+              <button
+                onClick={() => setMode("learn")}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  mode === "learn" ? "bg-orange-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Concepts
+              </button>
+            </div>
+
+            {mode === "learn" ? (
+              <div className="space-y-4">
+                {level.concepts.map((c, i) => (
+                  <div key={c.heading} className="p-4 rounded-xl bg-[#0c1426] border border-[#1b2844] space-y-1.5">
+                    <div className="text-[10px] font-mono text-orange-400">CONCEPT {String(i + 1).padStart(2, "0")}</div>
+                    <h3 className="text-sm font-bold text-white">{c.heading}</h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">{c.body}</p>
+                  </div>
+                ))}
+                <Button
+                  onClick={() => setMode("mission")}
+                  className="w-full bg-orange-600 hover:bg-orange-500 text-white font-medium text-xs"
+                >
+                  Start Missions <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
+                  ACTIVE MISSIONS
+                </div>
+
+                <div className="space-y-3">
+                  {level.missions.map((m) => {
+                    const done = m.validate(repo, history);
+                    return (
+                      <div
+                        key={m.id}
+                        className={`p-4 rounded-xl border transition-all ${
+                          done ? "bg-emerald-950/20 border-emerald-500/40 text-emerald-200" : "bg-[#0c1426] border-[#1b2844]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            {done ? <Check className="h-4 w-4 text-emerald-400" /> : <Play className="h-3.5 w-3.5 text-orange-400" />}
+                            {m.title}
+                          </h3>
+                          <span className="text-xs font-mono text-orange-400">+{m.xp} XP</span>
+                        </div>
+                        <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">{m.brief}</p>
+
+                        <div className="mt-3 space-y-1">
+                          {m.objectives.map((obj, i) => (
+                            <div key={i} className="flex items-center gap-2 text-xs text-slate-400">
+                              <span className="text-orange-400">▪</span> {obj}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Hints button */}
+                        <div className="mt-3 pt-2 border-t border-[#1a263e]">
+                          <details className="text-xs text-slate-400">
+                            <summary className="cursor-pointer text-orange-400/90 hover:text-orange-300">
+                              View Hints
+                            </summary>
+                            <div className="mt-2 space-y-1 pl-2 border-l-2 border-orange-500/40 text-[11px] font-mono">
+                              {m.hints.map((h, hi) => (
+                                <p key={hi}>{hi + 1}. {h}</p>
+                              ))}
+                            </div>
+                          </details>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
-          </aside>
 
-          <div className="min-w-0">
-            {/* Story */}
-            <div className="border border-border p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    Level {level.id} · {level.role}
-                  </p>
-                  <h2 className="mt-1.5 text-[18px] font-medium">
-                    {level.emoji} {level.title}
-                  </h2>
-                </div>
-                <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                  {levelMissionsDone}/{level.missions.length} missions
-                </span>
+            {/* Level Quick Switcher */}
+            <div className="pt-4 border-t border-[#1a263e]">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold mb-2">
+                ALL LEVELS
               </div>
-              <p className="mt-3 text-[13.5px] leading-[1.7] text-muted-foreground max-w-[720px]">{level.story}</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {levels.map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => selectLevel(l)}
+                    className={`p-2 rounded-lg text-center text-xs font-mono transition-colors ${
+                      l.id === level.id
+                        ? "bg-orange-600 text-white font-bold"
+                        : "bg-[#0e1629] border border-[#1b2742] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    LV {l.id}
+                  </button>
+                ))}
+              </div>
             </div>
+          </div>
 
-            {/* Modes */}
-            <div className="mt-4 flex items-center gap-px border border-border w-fit">
-              {([
-                ["learn", "Learn", BookOpen],
-                ["practice", "Practice", TerminalIcon],
-                ["mission", "Mission", GitBranch],
-              ] as const).map(([key, label, Icon]) => (
+          {/* Right Column: Tab Bar & Interactive Sandbox */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-[#050811]">
+            {/* Header Tabs */}
+            <div className="flex items-center justify-between border-b border-[#1a263e] bg-[#080d1a] px-4 py-2 shrink-0">
+              <div className="flex items-center gap-2">
                 <button
-                  key={key}
-                  onClick={() => setMode(key)}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] transition-colors ${
-                    mode === key ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
+                  onClick={() => setActiveTab("terminal")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                    activeTab === "terminal"
+                      ? "bg-[#18233c] text-white border border-orange-500/40 shadow-sm"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-[#121a2d]"
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5" /> {label}
+                  <TerminalIcon className="h-3.5 w-3.5 text-orange-400" />
+                  Terminal
                 </button>
-              ))}
+
+                <button
+                  onClick={() => setActiveTab("files")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                    activeTab === "files"
+                      ? "bg-[#18233c] text-white border border-orange-500/40 shadow-sm"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-[#121a2d]"
+                  }`}
+                >
+                  <FileCode className="h-3.5 w-3.5 text-orange-400" />
+                  Files
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("graph")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                    activeTab === "graph"
+                      ? "bg-[#18233c] text-white border border-orange-500/40 shadow-sm"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-[#121a2d]"
+                  }`}
+                >
+                  <GitBranch className="h-3.5 w-3.5 text-orange-400" />
+                  Commit Graph
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-orange-400/90 tracking-wider">
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-pulse" />
+                  BRANCH: {branch}
+                </span>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => resetLab()}
+                  className="h-7 text-xs text-slate-400 hover:text-rose-400 flex items-center gap-1.5 px-2"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </Button>
+              </div>
             </div>
 
-            {!level.available ? (
-              <div className="mt-4 border border-dashed border-border p-10 text-center text-[13px] text-muted-foreground">
-                Level {level.id} is still being built. Finish levels 1–5 in the meantime.
-              </div>
-            ) : mode === "learn" ? (
-              <div className="mt-4 border border-border divide-y divide-border">
-                {level.concepts.map((c, i) => (
-                  <section key={c.heading} className="p-5">
-                    <span className="text-[11px] font-mono text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
-                    <h3 className="mt-1.5 text-[15px] font-medium">{c.heading}</h3>
-                    <p className="mt-2 text-[13.5px] leading-[1.7] text-muted-foreground max-w-[680px]">{c.body}</p>
-                  </section>
-                ))}
-                <div className="p-5">
-                  <Button size="sm" className="h-8 text-[12.5px] gap-1.5" onClick={() => setMode("practice")}>
-                    Try it yourself <ChevronRight className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ) : mode === "mission" ? (
-              <div className="mt-4 space-y-px">
-                {level.missions.map((m) => {
-                  const used = hintsUsed[m.id] ?? 0;
-                  const complete = !!progress.completed[m.id];
-                  return (
-                    <div key={m.id} className="border border-border p-5">
-                      <div className="flex items-start justify-between gap-4">
-                        <h3 className="text-[15px] font-medium flex items-center gap-2">
-                          {complete && <Check className="h-4 w-4 text-primary" />} {m.title}
-                        </h3>
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                          Reward: +{xpAfterHints(m.xp, used)} XP
-                        </span>
-                      </div>
-                      <p className="mt-2 text-[13.5px] leading-[1.7] text-muted-foreground">{m.brief}</p>
-                      <ul className="mt-3 space-y-1">
-                        {m.objectives.map((o) => (
-                          <li key={o} className="text-[12.5px] text-muted-foreground flex items-center gap-2">
-                            <span className="text-[11px]">{complete ? "☑" : "☐"}</span> {o}
-                          </li>
-                        ))}
-                      </ul>
-                      {!complete && (
-                        <div className="mt-4">
-                          {used > 0 && (
-                            <div className="mb-2 space-y-1">
-                              {m.hints.slice(0, used).map((h, i) => (
-                                <p key={i} className="text-[12.5px] text-muted-foreground border-l-2 border-border pl-3">
-                                  Hint {i + 1}: {h}
-                                </p>
-                              ))}
-                            </div>
-                          )}
-                          {used < m.hints.length && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-[12px] gap-1.5"
-                              onClick={() => setHintsUsed((h) => ({ ...h, [m.id]: used + 1 }))}
-                            >
-                              <Lightbulb className="h-3.5 w-3.5" /> Need a hint?
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      {complete && <p className="mt-3 text-[12.5px] text-primary">{m.done}</p>}
+            {/* Tab 1: Terminal */}
+            {activeTab === "terminal" && (
+              <div
+                className="flex-1 flex flex-col p-4 bg-[#050811] overflow-hidden font-mono text-[13px] cursor-text"
+                onClick={() => inputRef.current?.focus()}
+              >
+                <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-1.5 pr-2">
+                  {lines.map((l, i) => (
+                    <div
+                      key={i}
+                      className={
+                        l.kind === "cmd"
+                          ? "text-slate-100 font-semibold"
+                          : l.kind === "err"
+                          ? "text-rose-400 pl-2"
+                          : l.kind === "sys"
+                          ? "text-orange-400 font-medium"
+                          : "text-slate-300 leading-relaxed pl-1"
+                      }
+                    >
+                      {l.kind === "cmd" && <span className="text-emerald-400 mr-2">student@nexa:~/project$</span>}
+                      {l.text}
                     </div>
-                  );
-                })}
-                <div className="border border-border p-5">
-                  <Button size="sm" className="h-8 text-[12.5px] gap-1.5" onClick={() => setMode("practice")}>
-                    Open the sandbox <ChevronRight className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-[240px_1fr] gap-px bg-border border border-border">
-                {/* Explorer */}
-                <div className="bg-background p-3 flex flex-col">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Project explorer</p>
-                    <button onClick={createFile} className="text-[11px] text-muted-foreground hover:text-foreground">+ new</button>
-                  </div>
-                  <div className="space-y-0.5">
-                    {Object.keys(repo.workingTree)
-                      .sort()
-                      .map((path) => (
-                        <button
-                          key={path}
-                          onClick={() => setOpenFile(path === openFile ? null : path)}
-                          className={`w-full text-left px-2 py-1 text-[12.5px] font-mono flex items-center gap-1.5 transition-colors ${
-                            openFile === path ? "bg-accent" : "hover:bg-accent/50"
-                          }`}
-                        >
-                          <FileCode className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span className="truncate">{path}</span>
-                        </button>
-                      ))}
-                  </div>
+                  ))}
 
-                  <div className="mt-4 pt-3 border-t border-border">
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-2">Forge · nexa/web-app</p>
-                    <p className="text-[12px] font-mono">branch: {branch}</p>
-                    <div className="mt-2 space-y-0.5">
-                      {commits.slice(0, 5).map((c) => (
-                        <p key={c.hash} className="text-[11.5px] font-mono text-muted-foreground truncate">
-                          {c.hash} {c.message}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Button variant="outline" size="sm" className="mt-4 h-7 text-[12px] gap-1.5" onClick={() => resetLab()}>
-                    <RotateCcw className="h-3.5 w-3.5" /> Restart lab
-                  </Button>
-                </div>
-
-                {/* Editor + terminal */}
-                <div className="bg-background flex flex-col min-w-0">
-                  {openFile && (
-                    <div className="border-b border-border p-3">
-                      <p className="text-[11.5px] font-mono text-muted-foreground mb-2">{openFile}</p>
-                      <Textarea
-                        value={repo.workingTree[openFile] ?? ""}
-                        onChange={(e) => saveFile(openFile, e.target.value)}
-                        spellCheck={false}
-                        className="font-mono text-[12.5px] min-h-[180px] bg-card resize-y"
-                      />
-                      <p className="mt-1.5 text-[11px] text-muted-foreground">Changes save to the working tree as you type.</p>
-                    </div>
-                  )}
-                  <div
-                    ref={scrollRef}
-                    onClick={() => inputRef.current?.focus()}
-                    className="flex-1 min-h-[320px] max-h-[460px] overflow-auto p-3 font-mono text-[12.5px] leading-[1.65] cursor-text"
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      submit(input);
+                    }}
+                    className="flex items-center gap-2 pt-1"
                   >
-                    {lines.map((l, i) => (
-                      <pre
-                        key={i}
-                        className={`whitespace-pre-wrap break-words ${
-                          l.kind === "cmd"
-                            ? "text-foreground"
-                            : l.kind === "err"
-                            ? "text-destructive"
-                            : l.kind === "sys"
-                            ? "text-primary"
-                            : "text-muted-foreground"
+                    <span className="text-emerald-400 font-semibold shrink-0 select-none">
+                      student@nexa:~/project$
+                    </span>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder="git status, git add, git commit..."
+                      className="flex-1 bg-transparent border-none outline-none text-white font-mono text-[13px] p-0 placeholder:text-slate-600 focus:ring-0"
+                      autoFocus
+                      spellCheck={false}
+                    />
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Files Editor */}
+            {activeTab === "files" && (
+              <div className="flex-1 flex flex-col overflow-hidden bg-[#050811]">
+                <div className="flex items-center justify-between border-b border-[#1b263e] bg-[#090e1c] px-3 py-2">
+                  <div className="flex items-center gap-1 overflow-x-auto">
+                    {Object.keys(repo.workingTree).map((filename) => (
+                      <button
+                        key={filename}
+                        onClick={() => {
+                          setOpenFile(filename);
+                          setFileContent(repo.workingTree[filename] || "");
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors ${
+                          openFile === filename
+                            ? "bg-[#18233c] text-orange-300 border border-orange-500/40"
+                            : "text-slate-400 hover:text-slate-200"
                         }`}
                       >
-                        {l.kind === "cmd" ? `student@git-lab:~/project$ ${l.text}` : l.text}
-                      </pre>
+                        <FileCode className="h-3.5 w-3.5 text-orange-400" />
+                        {filename}
+                      </button>
                     ))}
-                    <div className="flex items-center gap-2">
-                      <span className="text-primary shrink-0">student@git-lab:~/project$</span>
-                      <input
-                        ref={inputRef}
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            submit(input);
-                            setInput("");
-                          }
-                        }}
-                        spellCheck={false}
-                        autoFocus
-                        className="flex-1 bg-transparent outline-none border-0 text-foreground"
-                      />
-                    </div>
                   </div>
+
+                  {openFile && (
+                    <Button
+                      onClick={() => saveFile(openFile, fileContent)}
+                      size="sm"
+                      className="h-7 px-3 text-xs bg-orange-600 hover:bg-orange-500 text-white font-mono"
+                    >
+                      Save Changes
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex-1 relative flex overflow-hidden">
+                  <textarea
+                    value={fileContent}
+                    onChange={(e) => setFileContent(e.target.value)}
+                    className="flex-1 w-full p-4 bg-transparent resize-none font-mono text-[13px] leading-relaxed text-slate-200 border-none outline-none focus:ring-0 selection:bg-orange-500/30"
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Commit Graph Visualizer */}
+            {activeTab === "graph" && (
+              <div className="flex-1 p-6 overflow-y-auto space-y-4 font-mono text-xs bg-[#050811]">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-white font-bold text-sm">Git Commit Tree ({commits.length} commits)</h3>
+                  <span className="text-slate-400">HEAD at: {branch}</span>
+                </div>
+
+                <div className="space-y-3">
+                  {commits.map((c) => {
+                    const isHead = (repo.detached ? repo.detached : repo.branches[repo.head]) === c.hash;
+                    const matchingBranches = Object.entries(repo.branches)
+                      .filter(([, hash]) => hash === c.hash)
+                      .map(([name]) => name);
+
+                    return (
+                      <div
+                        key={c.hash}
+                        className={`p-4 rounded-xl border ${
+                          isHead ? "bg-[#101b33] border-orange-500/50 shadow-md" : "bg-[#0b1222] border-[#1b2742]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-black/60 font-mono text-orange-300 font-bold">
+                              {c.hash.slice(0, 7)}
+                            </span>
+                            <span className="text-white font-bold text-sm">{c.message}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {matchingBranches.map((bName) => (
+                              <span
+                                key={bName}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  bName === "main"
+                                    ? "bg-cyan-950 text-cyan-400 border border-cyan-800"
+                                    : "bg-purple-950 text-purple-400 border border-purple-800"
+                                }`}
+                              >
+                                {bName}
+                              </span>
+                            ))}
+                            {isHead && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">
+                                HEAD
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-2 text-slate-400 text-[11px]">
+                          Author: {c.author} · Parent: {c.parent?.slice(0, 7) || "root"}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {toast && (
-        <div className="fixed bottom-5 right-5 z-50 border border-border bg-card px-4 py-3 text-[13px] font-medium shadow-lg">
-          {toast}
-        </div>
-      )}
-    </AppLayout>
+    </LabLayout>
   );
 }

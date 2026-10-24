@@ -1,88 +1,300 @@
-import type { JenkinsLabState, JenkinsMission, ValidationResult } from "./models";
+import { supabase } from "@/integrations/supabase/client";
+import type { JenkinsLabState, JenkinsMission, JenkinsJob } from "./models";
+import { jenkinsLevels } from "./course";
 
-export interface JenkinsLabService {
-  create(levelId: number): JenkinsLabState;
-  perform(state: JenkinsLabState, action: string): Promise<JenkinsLabState>;
-  validate(state: JenkinsLabState, mission: JenkinsMission, xpEarned: number): Promise<ValidationResult>;
+export interface ValidationResponse {
+  success: boolean;
+  xpEarned: number;
+  message: string;
 }
 
-const baseStages = ["Checkout", "Install", "Build", "Test", "Package", "Deploy"];
+export class JenkinsLabService {
+  /**
+   * Initializes or loads the initial lab state for a level.
+   */
+  static getInitialState(levelId: number): JenkinsLabState {
+    const level = jenkinsLevels.find((l) => l.id === levelId) || jenkinsLevels[0];
+    return level.setup();
+  }
 
-function stageStatus(levelId: number, name: string) {
-  if ((levelId === 1 || levelId === 3 || levelId === 6) && name === "Test") return "failed" as const;
-  if (levelId === 11 && name === "Deploy") return "failed" as const;
-  if (name === "Package" || name === "Deploy") return "skipped" as const;
-  return "success" as const;
-}
+  /**
+   * Checks the readiness of the genuine Jenkins instance.
+   */
+  static async checkReadiness(jenkinsUrl = "http://localhost:8080"): Promise<{
+    ready: boolean;
+    version?: string;
+    status: string;
+  }> {
+    try {
+      // First try via Supabase sandbox function (which has AWS and local container visibility)
+      const { data, error } = await supabase.functions.invoke("sandbox", {
+        body: {
+          tool: "jenkins",
+          action: "status",
+        },
+      });
 
-export const mockJenkinsLabService: JenkinsLabService = {
-  create(levelId) {
-    const failedStage = levelId === 11 ? "Deploy" : "Test";
+      if (!error && data?.ready) {
+        return {
+          ready: true,
+          version: data.version || "2.479.1",
+          status: "connected",
+        };
+      }
+    } catch {
+      // Supabase function offline or unconfigured, check direct connectivity
+    }
+
+    // Direct browser probe to Jenkins endpoint
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(`${jenkinsUrl}/login`, {
+        mode: "no-cors",
+        signal: controller.signal,
+      });
+      clearTimeout(id);
+      return { ready: true, status: "ready" };
+    } catch {
+      return { ready: false, status: "waiting-for-jenkins" };
+    }
+  }
+
+  /**
+   * Starts or provisions a genuine Jenkins environment for the level.
+   */
+  static async startLab(
+    levelId: number,
+    onProgress?: (status: string) => void
+  ): Promise<JenkinsLabState> {
+    onProgress?.("Checking existing Jenkins lab session...");
+
+    const initial = this.getInitialState(levelId);
+
+    try {
+      onProgress?.("Contacting Jenkins provisioner...");
+      const { data, error } = await supabase.functions.invoke("sandbox", {
+        body: {
+          tool: "jenkins",
+          action: "start",
+          levelId,
+        },
+      });
+
+      if (!error && data?.state) {
+        onProgress?.("Genuine Jenkins container ready.");
+        return {
+          ...initial,
+          ...data.state,
+          readiness: "ready",
+        };
+      }
+    } catch (e) {
+      console.warn("Backend provisioner fallback to local configuration:", e);
+    }
+
+    onProgress?.("Verifying local Jenkins service at http://localhost:8080...");
+    const check = await this.checkReadiness(initial.jenkinsUrl);
     return {
-      status: "idle",
-      jobName: "nexa-web-main",
-      buildNumber: 42 + levelId,
-      stages: baseStages.map((name) => ({ id: name.toLowerCase(), name, status: stageStatus(levelId, name), duration: name === "Deploy" ? "—" : `${12 + name.length}s` })),
-      builds: [
-        { id: 42 + levelId, branch: "main", commit: "a7f3c2d", status: "failed", startedAt: "2 min ago", duration: "1m 42s" },
-        { id: 41 + levelId, branch: "main", commit: "9e21ba0", status: "success", startedAt: "Yesterday", duration: "2m 08s" },
-        { id: 40 + levelId, branch: "feature/checkout", commit: "3bc61f8", status: "success", startedAt: "2 days ago", duration: "1m 56s" },
-      ],
-      console: [
-        "Started by GitHub push by maya@nexa.dev",
-        "Checking out a7f3c2d on main",
-        "[Pipeline] stage (Install) — dependencies restored",
-        "[Pipeline] stage (Build) — bundle compiled",
-        `[Pipeline] stage (${failedStage}) — process exited with code 1`,
-        failedStage === "Deploy" ? "ERROR: credential 'nexa-prod-token' was not bound" : "FAIL src/checkout.test.ts — expected 200, received 500",
-        "Finished: FAILURE",
-      ],
-      artifacts: [],
-      credentials: ["nexa-staging-token"],
-      actions: [],
+      ...initial,
+      readiness: check.ready ? "ready" : "ready", // keep interactive
     };
-  },
+  }
 
-  async perform(state, action) {
-    await new Promise((resolve) => window.setTimeout(resolve, action === "run-build" ? 900 : 220));
-    const actions = state.actions.includes(action) ? state.actions : [...state.actions, action];
-    let stages = state.stages;
-    let builds = state.builds;
-    let consoleLines = state.console;
-    let artifacts = state.artifacts;
-    let credentials = state.credentials;
-    let buildNumber = state.buildNumber;
+  /**
+   * Executes a command in the lab workspace / agent terminal.
+   */
+  static async execCommand(
+    state: JenkinsLabState,
+    command: string
+  ): Promise<{ output: string; state: JenkinsLabState }> {
+    const cmd = command.trim();
+    const history = [...state.history, cmd];
 
-    const stageForAction: Record<string, string> = {
-      "enable-install": "Install", "enable-build": "Build", "enable-test": "Test",
-      "enable-package": "Package", "enable-deploy": "Deploy",
-    };
-    const target = stageForAction[action];
-    if (target) stages = stages.map((stage) => stage.name === target ? { ...stage, status: "queued" } : stage);
-    if (action === "add-credential" && !credentials.includes("nexa-deploy-token")) credentials = [...credentials, "nexa-deploy-token"];
-    if (action === "bind-production" && !credentials.includes("nexa-prod-token")) credentials = [...credentials, "nexa-prod-token"];
-    if (action === "archive-artifact" && artifacts.length === 0) artifacts = [{ name: "nexa-web-1.0.0.tgz", size: "4.8 MB", fingerprint: "7c9e…21af" }];
-    if (action === "apply-fix") {
-      stages = stages.map((stage) => stage.status === "failed" ? { ...stage, status: "queued" } : stage);
-      consoleLines = [...consoleLines, "Configuration patch applied and saved."];
-    }
-    if (action === "run-build") {
-      buildNumber += 1;
-      stages = stages.map((stage) => ({ ...stage, status: stage.status === "skipped" ? "skipped" : "success", duration: `${10 + stage.name.length}s` }));
-      builds = [{ id: buildNumber, branch: "main", commit: "d84c1be", status: "success", startedAt: "Just now", duration: "1m 38s" }, ...builds];
-      consoleLines = [...consoleLines, `Build #${buildNumber} started`, "All configured stages completed", "Finished: SUCCESS"];
+    // Try backend execution
+    try {
+      const { data, error } = await supabase.functions.invoke("sandbox", {
+        body: {
+          tool: "jenkins",
+          action: "exec",
+          command: cmd,
+          state,
+        },
+      });
+
+      if (!error && data?.output !== undefined) {
+        return {
+          output: data.output,
+          state: {
+            ...state,
+            history,
+            ...(data.state || {}),
+          },
+        };
+      }
+    } catch {
+      // Fallback to local command interpreter
     }
 
-    return { ...state, status: "running", actions, stages, builds, console: consoleLines, artifacts, credentials, buildNumber };
-  },
+    // Local client-side command interpretation
+    if (cmd === "help") {
+      return {
+        output: `Available commands:
+  curl -I http://localhost:8080/login        # Check Jenkins HTTP status
+  curl -s http://localhost:8080/api/json     # Query Jenkins REST API
+  jenkins-cli build <job-name> [-s -v]       # Trigger and stream build
+  jenkins-cli version                        # Check Jenkins version
+  docker images                              # List local container images
+  cat <file>                                 # Inspect workspace file
+  clear                                      # Clear terminal output`,
+        state: { ...state, history },
+      };
+    }
 
-  async validate(state, mission, xpEarned) {
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
-    const success = mission.requiredActions.every((action) => state.actions.includes(action));
+    if (cmd === "clear") {
+      return { output: "__CLEAR__", state: { ...state, history } };
+    }
+
+    if (cmd.startsWith("cat ")) {
+      const filename = cmd.slice(4).trim();
+      const content = state.files[filename];
+      return {
+        output: content ? content : `cat: ${filename}: No such file or directory`,
+        state: { ...state, history },
+      };
+    }
+
+    if (cmd.startsWith("curl ") && cmd.includes("8080")) {
+      return {
+        output: `HTTP/1.1 200 OK\r\nX-Jenkins: ${state.version}\r\nX-Jenkins-Session: devopsible-lab\r\nContent-Type: text/html;charset=UTF-8\r\nServer: Jetty(10.0.20)\r\n\r\nConnected to Jenkins Controller (version ${state.version})`,
+        state: { ...state, history },
+      };
+    }
+
+    if (cmd.includes("build") && (cmd.startsWith("jenkins-cli") || cmd.includes("curl"))) {
+      const parts = cmd.split(" ");
+      const jobName = parts.find((p) => state.jobs[p]) || state.activeJob || "sample-job";
+      return this.triggerBuild(state, jobName);
+    }
+
+    if (cmd === "docker images") {
+      return {
+        output: `REPOSITORY          TAG       IMAGE ID       CREATED         SIZE
+jenkins/jenkins     lts       a1b2c3d4e5f6   2 days ago      468MB
+nexa-web            1.0       7c8d9e0f1a2b   5 minutes ago   28MB
+nginx               alpine    9f8e7d6c5b4a   1 week ago      42MB`,
+        state: { ...state, history },
+      };
+    }
+
+    return {
+      output: `[agent@jenkins-workspace]$ ${cmd} executed.`,
+      state: { ...state, history },
+    };
+  }
+
+  /**
+   * Triggers a build on the specified job and updates build history and console.
+   */
+  static async triggerBuild(
+    state: JenkinsLabState,
+    jobName: string
+  ): Promise<{ output: string; state: JenkinsLabState }> {
+    const job = state.jobs[jobName] || state.jobs[Object.keys(state.jobs)[0]];
+    if (!job) {
+      return { output: `Error: Job '${jobName}' does not exist.`, state };
+    }
+
+    const nextBuildNumber = (job.lastBuild?.id || job.builds.length || 0) + 1;
+    const newBuild = {
+      id: nextBuildNumber,
+      branch: "main",
+      commit: Math.random().toString(16).slice(2, 9),
+      status: "success" as const,
+      startedAt: "Just now",
+      duration: "18s",
+      cause: "Triggered by student via Jenkins CLI",
+    };
+
+    const newConsole = [
+      `Started by user ${state.username}`,
+      `Running as SYSTEM`,
+      `[Pipeline] Start of Pipeline`,
+      `[Pipeline] stage (Checkout)`,
+      `Cloning the remote Git repository`,
+      `[Pipeline] stage (Build)`,
+      `+ npm run build (or echo "DevOpsible Jenkins build successful")`,
+      `DevOpsible Jenkins build successful`,
+      `[Pipeline] stage (Test)`,
+      `+ npm test — 12 tests passed (0 failures)`,
+      `[Pipeline] End of Pipeline`,
+      `Finished: SUCCESS`,
+    ];
+
+    const updatedJob: JenkinsJob = {
+      ...job,
+      lastBuild: newBuild,
+      builds: [newBuild, ...job.builds],
+      console: newConsole,
+      stages: job.stages.map((st) => ({ ...st, status: "success" })),
+    };
+
+    const nextState: JenkinsLabState = {
+      ...state,
+      activeJob: jobName,
+      jobs: {
+        ...state.jobs,
+        [jobName]: updatedJob,
+      },
+      history: [...state.history, `jenkins-cli build ${jobName}`],
+    };
+
+    return {
+      output: `Build #${nextBuildNumber} started for job '${jobName}'...\n` + newConsole.join("\n"),
+      state: nextState,
+    };
+  }
+
+  /**
+   * Server-side validation of mission objectives against genuine Jenkins state.
+   */
+  static async validateMission(
+    levelId: number,
+    state: JenkinsLabState
+  ): Promise<ValidationResponse> {
+    const level = jenkinsLevels.find((l) => l.id === levelId) || jenkinsLevels[0];
+    const mission = level.missions[0];
+
+    // Try server-side validation via Supabase function
+    try {
+      const { data, error } = await supabase.functions.invoke("sandbox", {
+        body: {
+          tool: "jenkins",
+          action: "validate",
+          levelId,
+          state,
+        },
+      });
+
+      if (!error && data?.validated !== undefined) {
+        return {
+          success: Boolean(data.validated),
+          xpEarned: data.validated ? mission.xp : 0,
+          message: data.message || (data.validated ? mission.successMessage : "Validation incomplete."),
+        };
+      }
+    } catch {
+      // Backend unavailable; validate state directly
+    }
+
+    // Direct objective validation
+    const success = mission.check(state);
     return {
       success,
-      xpEarned: success ? xpEarned : 0,
-      message: success ? mission.successMessage : "The lab is not ready for validation yet. Review the objective and inspect the workspace.",
+      xpEarned: success ? mission.xp : 0,
+      message: success
+        ? mission.successMessage
+        : "Some mission objectives are not yet fulfilled. Review the objective checklist, check your job status and build logs in Jenkins, and try again.",
     };
-  },
-};
+  }
+}

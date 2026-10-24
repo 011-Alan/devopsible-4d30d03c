@@ -1,147 +1,724 @@
-import type { JenkinsLevel, JenkinsMission } from "./models";
+import type { JenkinsLevel, JenkinsLabState } from "./models";
 
-const mission = (
-  id: string,
-  title: string,
-  problem: string,
-  objective: string,
-  difficulty: JenkinsMission["difficulty"],
-  xp: number,
-  requiredActions: string[],
-  hints: string[],
-  successMessage: string,
-): JenkinsMission => ({ id, title, problem, objective, difficulty, xp, requiredActions, hints, successMessage });
+const defaultJenkinsState = (overrides: Partial<JenkinsLabState> = {}): JenkinsLabState => ({
+  readiness: "ready",
+  jenkinsUrl: "http://localhost:8080",
+  username: "student",
+  passwordHint: "devopsible",
+  version: "2.479.1",
+  activeJob: "sample-job",
+  jobs: {
+    "sample-job": {
+      name: "sample-job",
+      type: "freestyle",
+      stages: [{ id: "build", name: "Build", status: "success", duration: "12s" }],
+      builds: [
+        { id: 1, branch: "main", commit: "a7f3c2d", status: "success", startedAt: "5m ago", duration: "12s" },
+      ],
+      console: [
+        "Started by user student",
+        "Running as SYSTEM",
+        "Building in workspace /var/jenkins_home/workspace/sample-job",
+        "[sample-job] $ /bin/sh -xe /tmp/jenkins84920.sh",
+        "+ echo 'Jenkins build server operational'",
+        "Jenkins build server operational",
+        "Finished: SUCCESS",
+      ],
+    },
+  },
+  artifacts: [],
+  credentials: ["nexa-deploy-token"],
+  files: {},
+  history: [],
+  ...overrides,
+});
 
 export const jenkinsLevels: JenkinsLevel[] = [
   {
-    id: 1, title: "Welcome to the Factory", role: "Pipeline Recruit", badge: "Pipeline Recruit",
-    story: "It is your first morning at Nexa. The web team needs you to understand the delivery factory before the next release train starts.",
-    concepts: ["Jobs turn source changes into repeatable work.", "Build history is the audit trail for every pipeline run."],
+    id: 1,
+    title: "Wake Up the Build Server",
+    role: "Pipeline Recruit",
+    badge: "Pipeline Recruit",
+    story:
+      "A development team has received a Jenkins instance, but a developer does not know how to inspect its status or identify available jobs. Verify that the service is operational.",
+    concepts: [
+      { heading: "Jenkins Controller", body: "The central server coordinating build queues, executors, plugins, and the web UI." },
+      { heading: "Build History", body: "The immutable record of every execution, including logs, status, artifacts, and parameters." },
+    ],
+    setup: () => defaultJenkinsState(),
     missions: [
-      mission("j1m1", "Inspect the factory", "The team has handed you the nexa-web pipeline with no context.", "Open the job and inspect its latest build history.", "Foundations", 100, ["open-job", "view-history"], ["Start from Jobs.", "Build history shows the newest run first."], "You mapped the job to its latest build."),
-      mission("j1m2", "Read the last run", "Build #42 failed overnight and the handover note is missing.", "Open the console and identify the failed Test stage.", "Foundations", 150, ["view-console", "inspect-test"], ["Failed stages are marked in red.", "The console preserves output in execution order."], "You traced the failure to the test gate."),
+      {
+        id: "j1",
+        title: "Wake Up the Build Server",
+        scenario: "Verify that the build server is responsive, healthy, and ready to accept CI/CD automation workloads.",
+        problem: "The handover documentation is missing. Verify Jenkins version, access the dashboard, and inspect existing jobs.",
+        objective: "Access the Jenkins dashboard, inspect available jobs, and confirm service readiness.",
+        difficulty: "Foundations",
+        xp: 100,
+        hints: [
+          "Open the Jenkins Web UI tab or open http://localhost:8080 in a new window.",
+          "Check the build history of 'sample-job'.",
+          "Use the terminal to verify the Jenkins HTTP response with `curl -I http://localhost:8080/login`.",
+        ],
+        suggested: ["curl -I http://localhost:8080/login", "jenkins-cli version", "curl -s http://localhost:8080/api/json"],
+        checks: [
+          {
+            label: "Genuine Jenkins service is reachable and operational",
+            test: (s) => s.readiness === "ready",
+          },
+          {
+            label: "Inspect available jobs on the Jenkins dashboard",
+            test: (s) => Object.keys(s.jobs).length > 0,
+          },
+          {
+            label: "Locate build history for the existing job",
+            test: (s) => (s.jobs["sample-job"]?.builds.length ?? 0) > 0,
+          },
+        ],
+        check: (s) => s.readiness === "ready" && Object.keys(s.jobs).length > 0,
+        successMessage: "Jenkins controller is live and operational. Build server ready for automated jobs.",
+      },
     ],
   },
   {
-    id: 2, title: "Build It", role: "Build Engineer", badge: "Build Engineer",
-    story: "Nexa needs a clean, reproducible build before anyone can trust the release artifact.",
-    concepts: ["A build should start from a clean checkout.", "Artifacts are immutable outputs, not files left on an agent."],
+    id: 2,
+    title: "Your First Build",
+    role: "Build Apprentice",
+    badge: "Build Apprentice",
+    story:
+      "A team wants to automate a simple application build but currently runs the process manually. Create and execute a Freestyle job.",
+    concepts: [
+      { heading: "Freestyle Project", body: "The fundamental job type in Jenkins for running linear shell tasks and build steps." },
+      { heading: "Console Output", body: "Live streaming log of stdout and stderr captured during build step execution." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        files: {
+          "build.sh": `#!/bin/bash\necho "DevOpsible Jenkins build successful"\nexit 0`,
+        },
+      }),
     missions: [
-      mission("j2m1", "Configure the build", "The job checks out code but never creates the application bundle.", "Enable Install and Build, then save the pipeline.", "Foundations", 150, ["enable-install", "enable-build", "save-pipeline"], ["Dependencies must be installed before compiling.", "Save the pipeline after changing its stages."], "The pipeline now produces a reproducible build."),
-      mission("j2m2", "Archive the bundle", "Successful builds disappear when the agent is recycled.", "Run the job and archive the generated bundle.", "Foundations", 200, ["run-build", "archive-artifact"], ["Run the corrected pipeline first.", "Artifacts belong to a specific build."], "Nexa can now retrieve the build output."),
+      {
+        id: "j2",
+        title: "Your First Build",
+        scenario: "Create a Freestyle project named 'first-build' that runs an automated shell command.",
+        problem: "Manual developer scripts fail due to environment differences. Centralize build execution in Jenkins.",
+        objective: "Create job 'first-build', add build step `echo \"DevOpsible Jenkins build successful\"`, and achieve a SUCCESS build.",
+        difficulty: "Foundations",
+        xp: 120,
+        hints: [
+          "In Jenkins, click 'New Item' -> select 'Freestyle project' -> name it 'first-build'.",
+          "Under 'Build Steps', add 'Execute shell' with: echo \"DevOpsible Jenkins build successful\".",
+          "Click 'Build Now' and verify console output ends with 'Finished: SUCCESS'.",
+        ],
+        suggested: [
+          "jenkins-cli build first-build -s -v",
+          "cat build.sh",
+          "curl -s http://localhost:8080/job/first-build/api/json",
+        ],
+        checks: [
+          {
+            label: "Job 'first-build' exists in Jenkins",
+            test: (s) => !!s.jobs["first-build"],
+          },
+          {
+            label: "Configured build step outputs required success message",
+            test: (s) => s.jobs["first-build"]?.console.some((c) => c.includes("DevOpsible Jenkins build successful")) ?? false,
+          },
+          {
+            label: "Build completed with status SUCCESS",
+            test: (s) => s.jobs["first-build"]?.lastBuild?.status === "success",
+          },
+        ],
+        check: (s) =>
+          !!s.jobs["first-build"] &&
+          s.jobs["first-build"].lastBuild?.status === "success" &&
+          s.jobs["first-build"].console.some((c) => c.includes("DevOpsible Jenkins build successful")),
+        successMessage: "First automated build executed cleanly! Your build step passed with status SUCCESS.",
+      },
     ],
   },
   {
-    id: 3, title: "Don't Ship Broken Code", role: "Test Runner", badge: "Test Runner",
-    story: "A green build is meaningless if the test suite never runs. Put quality between compilation and delivery.",
-    concepts: ["Quality gates stop bad work before packaging.", "Test reports make failures visible beyond raw logs."],
+    id: 3,
+    title: "Pipeline as Code",
+    role: "Pipeline Author",
+    badge: "Pipeline Author",
+    story:
+      "The development team has several manually configured build steps. They want the workflow to be stored in source control as a declarative Jenkinsfile.",
+    concepts: [
+      { heading: "Declarative Pipeline", body: "Structured Groovy syntax with pipeline { agent any; stages { ... } } for versioned delivery." },
+      { heading: "Stages & Steps", body: "Stages represent logical gates (Build, Test), containing granular execution steps." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        files: {
+          Jenkinsfile: `pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building application bundle'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'Running automated tests'
+            }
+        }
+    }
+}`,
+        },
+      }),
     missions: [
-      mission("j3m1", "Add the test gate", "The pipeline packages code immediately after Build.", "Enable Test and place it before Package.", "Foundations", 200, ["enable-test", "order-test"], ["Tests should run after compilation.", "A failed Test must block Package."], "Broken code can no longer pass the pipeline."),
-      mission("j3m2", "Repair the suite", "A checkout regression fails the new gate.", "Inspect the test failure, apply the prepared fix, and rerun successfully.", "Intermediate", 250, ["inspect-test", "apply-fix", "run-build"], ["The assertion name is in Console Output.", "Use the reviewed fix, then rerun the job."], "The suite is green and the gate is working."),
+      {
+        id: "j3",
+        title: "Pipeline as Code",
+        scenario: "Declare a versioned CI pipeline with Build and Test stages in a Jenkinsfile.",
+        problem: "UI-configured jobs drift and lack code reviews. Version the delivery pipeline in a Jenkinsfile.",
+        objective: "Create a Pipeline job 'declarative-pipeline' with Build and Test stages, and verify both stages pass.",
+        difficulty: "Foundations",
+        xp: 150,
+        hints: [
+          "Create a 'Pipeline' job named 'declarative-pipeline'.",
+          "Paste or load the Declarative Pipeline definition with 'Build' and 'Test' stages.",
+          "Run the build and verify the Stage View shows both stages green.",
+        ],
+        suggested: ["cat Jenkinsfile", "jenkins-cli build declarative-pipeline", "curl http://localhost:8080/job/declarative-pipeline/wfapi/runs"],
+        checks: [
+          {
+            label: "Pipeline job 'declarative-pipeline' created",
+            test: (s) => s.jobs["declarative-pipeline"]?.type === "pipeline",
+          },
+          {
+            label: "Pipeline includes both 'Build' and 'Test' stages",
+            test: (s) => {
+              const stages = s.jobs["declarative-pipeline"]?.stages || [];
+              return stages.some((st) => st.name === "Build") && stages.some((st) => st.name === "Test");
+            },
+          },
+          {
+            label: "Pipeline executes and finishes with SUCCESS",
+            test: (s) => s.jobs["declarative-pipeline"]?.lastBuild?.status === "success",
+          },
+        ],
+        check: (s) => {
+          const job = s.jobs["declarative-pipeline"];
+          return (
+            job?.type === "pipeline" &&
+            job.lastBuild?.status === "success" &&
+            job.stages.some((st) => st.name === "Build") &&
+            job.stages.some((st) => st.name === "Test")
+          );
+        },
+        successMessage: "Pipeline as Code mastered! Declarative stages executed and verified in Stage View.",
+      },
     ],
   },
   {
-    id: 4, title: "Pipeline as Code", role: "Pipeline Architect", badge: "Pipeline Architect",
-    story: "Manual job configuration has drifted across environments. Nexa wants the pipeline versioned beside the application.",
-    concepts: ["A Jenkinsfile makes delivery reviewable and repeatable.", "Declarative pipelines express agents, stages, steps, and post actions."],
+    id: 4,
+    title: "Fix the Broken Pipeline",
+    role: "Pipeline Troubleshooter",
+    badge: "Pipeline Troubleshooter",
+    story:
+      "A developer pushed a syntax error into the Jenkinsfile, turning the release board red. Open the console output, diagnose the failure, and fix the script.",
+    concepts: [
+      { heading: "Console Diagnostics", body: "Tracing failure logs backwards from the non-zero exit code to pinpoint syntax or command errors." },
+      { heading: "Pipeline Resiliency", body: "Fixing regressions and re-triggering builds while preserving historical failure audit trails." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        activeJob: "broken-pipeline",
+        jobs: {
+          "broken-pipeline": {
+            name: "broken-pipeline",
+            type: "pipeline",
+            stages: [
+              { id: "build", name: "Build", status: "success", duration: "10s" },
+              { id: "compile", name: "Compile", status: "failed", duration: "2s" },
+            ],
+            builds: [
+              { id: 1, branch: "main", commit: "b890fa1", status: "failed", startedAt: "3m ago", duration: "12s" },
+            ],
+            console: [
+              "[Pipeline] stage (Build)",
+              "[Pipeline] stage (Compile)",
+              "/tmp/jenkins.sh: line 4: npmm: command not found",
+              "[Pipeline] } // stage",
+              "ERROR: script returned exit code 127",
+              "Finished: FAILURE",
+            ],
+            jenkinsfile: `pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps { echo 'Initializing' }
+        }
+        stage('Compile') {
+            steps { sh 'npmm run build' } // TYPO: npmm instead of npm
+        }
+    }
+}`,
+          },
+        },
+        files: {
+          Jenkinsfile: `pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps { echo 'Initializing' }
+        }
+        stage('Compile') {
+            steps { sh 'npm run build' }
+        }
+    }
+}`,
+        },
+      }),
     missions: [
-      mission("j4m1", "Adopt a Jenkinsfile", "The job configuration only exists in the controller UI.", "Switch the job definition to Pipeline from SCM.", "Intermediate", 250, ["pipeline-from-scm", "save-pipeline"], ["Source control should own the definition.", "Select Jenkinsfile as the script path."], "The pipeline definition is now versioned."),
-      mission("j4m2", "Validate the definition", "The new Jenkinsfile has not been tested by the controller.", "Validate the syntax and run the pipeline.", "Intermediate", 250, ["validate-jenkinsfile", "run-build"], ["Validate before consuming an agent.", "A valid definition can still fail at runtime."], "The versioned pipeline runs successfully."),
+      {
+        id: "j4",
+        title: "Fix the Broken Pipeline",
+        scenario: "Diagnose why 'broken-pipeline' build #1 failed, repair the typo in the Jenkinsfile, and rerun.",
+        problem: "The release train is blocked by a typo in the compile stage ('npmm'). Correct it to 'npm'.",
+        objective: "Identify the failure in console output, correct 'npmm' to 'npm' in the Jenkinsfile, and get a green build.",
+        difficulty: "Intermediate",
+        xp: 180,
+        hints: [
+          "Check the console output of build #1 — notice 'npmm: command not found'.",
+          "Open the Pipeline tab / Jenkinsfile editor and fix the command to 'npm run build'.",
+          "Trigger a new build (Build #2) and confirm it passes.",
+        ],
+        suggested: ["cat Jenkinsfile", "jenkins-cli build broken-pipeline", "curl http://localhost:8080/job/broken-pipeline/1/consoleText"],
+        checks: [
+          {
+            label: "Inspect failed build console output",
+            test: (s) => (s.jobs["broken-pipeline"]?.builds.length ?? 0) >= 1,
+          },
+          {
+            label: "Correct the broken command in the Jenkinsfile",
+            test: (s) => !(s.jobs["broken-pipeline"]?.jenkinsfile || s.files["Jenkinsfile"] || "").includes("npmm"),
+          },
+          {
+            label: "Rerun pipeline and achieve a SUCCESS build",
+            test: (s) => s.jobs["broken-pipeline"]?.lastBuild?.status === "success",
+          },
+        ],
+        check: (s) =>
+          !(s.jobs["broken-pipeline"]?.jenkinsfile || s.files["Jenkinsfile"] || "").includes("npmm") &&
+          s.jobs["broken-pipeline"]?.lastBuild?.status === "success",
+        successMessage: "Pipeline repaired! Console error diagnosed, typo fixed, and Build #2 is green.",
+      },
     ],
   },
   {
-    id: 5, title: "The Assembly Line", role: "Automation Engineer", badge: "Automation Engineer",
-    story: "The release path is growing. Make each responsibility visible from checkout to package.",
-    concepts: ["Small stages reveal where time and failures accumulate.", "Parallel work can shorten independent checks."],
+    id: 5,
+    title: "Test Before You Ship",
+    role: "Quality Guardian",
+    badge: "Quality Guardian",
+    story:
+      "An application builds successfully, but broken code reached staging because tests were skipped. Add an automated test gate that blocks delivery on failure.",
+    concepts: [
+      { heading: "Quality Gates", body: "Automated test stages that prevent broken artifacts from moving down the deployment pipeline." },
+      { heading: "Test Reports", body: "Publishing JUnit/TAP test summaries directly to the Jenkins build report." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        files: {
+          "src/app.test.js": `const assert = require('assert');\nassert.strictEqual(2 + 2, 4);`,
+          Jenkinsfile: `pipeline {
+    agent any
+    stages {
+        stage('Build') { steps { echo 'Building...' } }
+        stage('Test') { steps { sh 'npm test' } }
+    }
+}`,
+        },
+      }),
     missions: [
-      mission("j5m1", "Complete the line", "The pipeline has no packaging stage or retained output.", "Enable Package and archive its artifact.", "Intermediate", 250, ["enable-package", "archive-artifact"], ["Package belongs after Test.", "Archive only after the package exists."], "The assembly line now creates a traceable release."),
-      mission("j5m2", "Run end to end", "The new stage graph has never completed as one delivery flow.", "Run all configured stages successfully.", "Intermediate", 300, ["run-build", "view-history"], ["Review the stage order first.", "Confirm the successful run in Build History."], "Every stage completed in sequence."),
+      {
+        id: "j5",
+        title: "Test Before You Ship",
+        scenario: "Configure an automated test stage that executes test suites and gates pipeline progression.",
+        problem: "Broken features slip into releases when tests are not enforced in CI.",
+        objective: "Configure a 'Test' stage, run unit tests, and verify that passing tests produce a successful build.",
+        difficulty: "Intermediate",
+        xp: 200,
+        hints: [
+          "Ensure the Jenkinsfile contains a 'Test' stage running 'npm test'.",
+          "Ensure your test suite in 'src/app.test.js' passes cleanly.",
+          "Run the build and verify the Test stage executes successfully.",
+        ],
+        suggested: ["npm test", "cat src/app.test.js", "jenkins-cli build tested-app"],
+        checks: [
+          {
+            label: "Pipeline definition includes an active 'Test' stage",
+            test: (s) =>
+              (s.files["Jenkinsfile"] || "").includes("stage('Test')") ||
+              Object.values(s.jobs).some((j) => j.stages.some((st) => st.name === "Test")),
+          },
+          {
+            label: "Automated test suite executes during the build",
+            test: (s) => Object.values(s.jobs).some((j) => j.console.some((c) => c.includes("test") || c.includes("npm test"))),
+          },
+          {
+            label: "Pipeline completes with verified green test gate",
+            test: (s) => Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+          },
+        ],
+        check: (s) =>
+          Object.values(s.jobs).some(
+            (j) => j.lastBuild?.status === "success" && j.stages.some((st) => st.name === "Test")
+          ),
+        successMessage: "Quality gate enforced! Automated tests verified and passing before build artifact creation.",
+      },
     ],
   },
   {
-    id: 6, title: "When the Pipeline Breaks", role: "Pipeline Fixer", badge: "Pipeline Fixer",
-    story: "A dependency upgrade has turned the release board red. Restore service using evidence, not guesses.",
-    concepts: ["Console output narrows a failure to the responsible step.", "Reruns prove a repair; they do not replace diagnosis."],
+    id: 6,
+    title: "The Git-to-Jenkins Connection",
+    role: "SCM Integrator",
+    badge: "SCM Integrator",
+    story:
+      "A developer pushes code to Git, but Jenkins cannot fetch the repository. Configure the Git SCM repository URL and branch to pull source into the workspace.",
+    concepts: [
+      { heading: "SCM Checkout", body: "Jenkins clones source from Git directly into the agent workspace on every build." },
+      { heading: "Branch Specifier", body: "Configuring target branches (e.g., */main) to control what gets built." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        files: {
+          "repo-config.txt": "url: https://github.com/nexa-cloud/nexa-web.git\nbranch: main",
+        },
+      }),
     missions: [
-      mission("j6m1", "Find the fault", "Build #47 failed after a dependency update.", "Inspect the failed stage and its console output.", "Intermediate", 250, ["view-console", "inspect-build"], ["Start with the first failed stage.", "Search the output around the non-zero exit."], "You found the incompatible build command."),
-      mission("j6m2", "Repair and verify", "The pipeline still contains the incompatible command.", "Apply the reviewed correction and rerun the pipeline.", "Intermediate", 300, ["apply-fix", "run-build"], ["Use the prepared configuration patch.", "Verification requires a new successful build."], "The release board is green again."),
+      {
+        id: "j6",
+        title: "The Git-to-Jenkins Connection",
+        scenario: "Configure Jenkins to retrieve application source code from a Git repository.",
+        problem: "Pipelines relying on local files cannot build code from distributed team members.",
+        objective: "Configure Git SCM in job 'git-pipeline' with repository URL and main branch, and execute a checkout.",
+        difficulty: "Intermediate",
+        xp: 220,
+        hints: [
+          "In job configuration, choose 'Git' under Source Code Management (or `git url: ...` in pipeline).",
+          "Set Repository URL to 'https://github.com/nexa-cloud/nexa-web.git' and Branch to '*/main'.",
+          "Execute the build and confirm Git checkout succeeds in console output.",
+        ],
+        suggested: ["git status", "git log -n 1", "curl http://localhost:8080/job/git-pipeline/api/json"],
+        checks: [
+          {
+            label: "Git SCM configured with target repository URL",
+            test: (s) =>
+              (s.jobs["git-pipeline"]?.scm?.url || "").includes("nexa-web") ||
+              (s.files["Jenkinsfile"] || "").includes("git "),
+          },
+          {
+            label: "Target branch specified as 'main'",
+            test: (s) =>
+              s.jobs["git-pipeline"]?.scm?.branch === "main" ||
+              s.jobs["git-pipeline"]?.lastBuild?.branch === "main",
+          },
+          {
+            label: "Build checks out source code successfully",
+            test: (s) =>
+              s.jobs["git-pipeline"]?.console.some((c) => c.includes("Cloning repository") || c.includes("Checking out")) ||
+              s.jobs["git-pipeline"]?.lastBuild?.status === "success",
+          },
+        ],
+        check: (s) =>
+          !!s.jobs["git-pipeline"] && s.jobs["git-pipeline"].lastBuild?.status === "success",
+        successMessage: "SCM connected! Jenkins is now cloning and synchronizing source directly from Git.",
+      },
     ],
   },
   {
-    id: 7, title: "Meet the Environment", role: "Agent Commander", badge: "Agent Commander",
-    story: "Nexa's builds are competing for the wrong machines. Route work to agents with the right capabilities.",
-    concepts: ["Labels match pipeline work to suitable agents.", "Environment variables configure builds without changing source."],
+    id: 7,
+    title: "Credentials and Secure Configuration",
+    role: "Secret Guardian",
+    badge: "Secret Guardian",
+    story:
+      "A deployment token was committed in plain text inside the Jenkinsfile! Move the token to Jenkins Credentials Store and bind it safely with withCredentials.",
+    concepts: [
+      { heading: "Credentials Store", body: "Encrypted vault in Jenkins for storing passwords, tokens, and SSH keys securely." },
+      { heading: "Secret Masking", body: "Jenkins automatically masks bound credentials with '****' in console output." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        credentials: ["nexa-deploy-token"],
+        files: {
+          Jenkinsfile: `pipeline {
+    agent any
+    environment {
+        DEPLOY_TOKEN = credentials('nexa-deploy-token')
+    }
+    stages {
+        stage('Deploy') {
+            steps {
+                echo "Deploying with token: \${DEPLOY_TOKEN}"
+            }
+        }
+    }
+}`,
+        },
+      }),
     missions: [
-      mission("j7m1", "Choose the right agent", "Container builds are queued on agents without Docker.", "Assign the docker agent label and save the pipeline.", "Intermediate", 300, ["select-agent", "save-pipeline"], ["Inspect the available agent labels.", "The docker label exposes the required daemon."], "Container builds now reach capable agents."),
-      mission("j7m2", "Set the environment", "The application bundle is missing its target environment.", "Configure NEXA_ENV and run a successful build.", "Intermediate", 300, ["set-environment", "run-build"], ["Use pipeline environment settings.", "The value for this mission is staging."], "The artifact now carries the staging configuration."),
+      {
+        id: "j7",
+        title: "Credentials and Secure Configuration",
+        scenario: "Protect production secrets by binding credentials without exposing plain-text tokens.",
+        problem: "Committed secrets in Git leak to public logs and breach compliance rules.",
+        objective: "Configure credential 'nexa-deploy-token' in Jenkins and bind it in the pipeline using credentials().",
+        difficulty: "Advanced",
+        xp: 250,
+        hints: [
+          "Navigate to 'Manage Jenkins' -> 'Credentials' -> System -> Global.",
+          "Verify credential ID 'nexa-deploy-token' is registered.",
+          "Use `withCredentials([string(credentialsId: 'nexa-deploy-token', variable: 'TOKEN')])` or `credentials()`.",
+          "Confirm logs show '****' instead of the plain-text secret.",
+        ],
+        suggested: ["jenkins-cli list-credentials system::system::jenkins", "cat Jenkinsfile"],
+        checks: [
+          {
+            label: "Credential 'nexa-deploy-token' registered in Jenkins",
+            test: (s) => s.credentials.includes("nexa-deploy-token"),
+          },
+          {
+            label: "Jenkinsfile references credentials without plain text secrets",
+            test: (s) =>
+              (s.files["Jenkinsfile"] || "").includes("credentials('nexa-deploy-token')") ||
+              (s.files["Jenkinsfile"] || "").includes("nexa-deploy-token"),
+          },
+          {
+            label: "Pipeline executes with credential binding",
+            test: (s) => Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+          },
+        ],
+        check: (s) =>
+          s.credentials.includes("nexa-deploy-token") &&
+          Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+        successMessage: "Secret secured! Credential safely bound and masked in build logs.",
+      },
     ],
   },
   {
-    id: 8, title: "Secrets Don't Belong in Code", role: "Pipeline Guardian", badge: "Pipeline Guardian",
-    story: "A deployment token was committed in plain text. Remove it and wire the pipeline to Jenkins credentials.",
-    concepts: ["Credentials should be scoped and injected only when needed.", "Logs must never expose secret values."],
+    id: 8,
+    title: "Docker Build and Image Pipeline",
+    role: "Container Pipeline Pro",
+    badge: "Container Pipeline Pro",
+    story:
+      "Automate container packaging. Configure Jenkins to build an application Docker image and apply a version tag after tests pass.",
+    concepts: [
+      { heading: "Docker in CI", body: "Building, tagging, and scanning container images directly inside the automated build lifecycle." },
+      { heading: "Image Tagging", body: "Labeling images with semantic versions (nexa-web:1.0) and git commit hashes." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        files: {
+          Dockerfile: "FROM nginx:alpine\nCOPY index.html /usr/share/nginx/html/\nEXPOSE 80",
+          "index.html": "<h1>Nexa Containerized Release</h1>",
+          Jenkinsfile: `pipeline {
+    agent any
+    stages {
+        stage('Build Image') {
+            steps {
+                sh 'docker build -t nexa-web:1.0 .'
+            }
+        }
+    }
+}`,
+        },
+      }),
     missions: [
-      mission("j8m1", "Store the credential", "The deploy token is embedded in the Jenkinsfile.", "Create a scoped credential named nexa-deploy-token.", "Advanced", 350, ["add-credential"], ["Open Credentials in the workspace.", "Use the exact ID requested by the deployment step."], "The token is now held outside source control."),
-      mission("j8m2", "Bind it safely", "The deployment step still reads the old plain-text value.", "Bind the stored credential, remove the exposed value, and validate.", "Advanced", 350, ["bind-credential", "validate-jenkinsfile"], ["Reference the credential ID, not its value.", "Validate that logs only show masked output."], "The pipeline now handles its deployment secret safely."),
+      {
+        id: "j8",
+        title: "Docker Build and Image Pipeline",
+        scenario: "Automate container image generation by executing 'docker build' in the Jenkins pipeline.",
+        problem: "Building images manually on developer laptops leads to non-reproducible artifacts.",
+        objective: "Add a Docker build stage to Jenkinsfile, build image 'nexa-web:1.0', and verify image creation.",
+        difficulty: "Advanced",
+        xp: 280,
+        hints: [
+          "In the Jenkinsfile, add a stage: `sh 'docker build -t nexa-web:1.0 .'`.",
+          "Run the build and verify the Docker step finishes successfully.",
+          "Check terminal with `docker images` to confirm image 'nexa-web:1.0' exists.",
+        ],
+        suggested: ["docker images", "cat Dockerfile", "cat Jenkinsfile"],
+        checks: [
+          {
+            label: "Dockerfile present in build workspace",
+            test: (s) => (s.files["Dockerfile"] || "").includes("FROM"),
+          },
+          {
+            label: "Pipeline executes 'docker build' command",
+            test: (s) =>
+              (s.files["Jenkinsfile"] || "").includes("docker build") ||
+              Object.values(s.jobs).some((j) => j.console.some((c) => c.includes("docker build"))),
+          },
+          {
+            label: "Docker image 'nexa-web:1.0' created and tagged",
+            test: (s) =>
+              Object.values(s.jobs).some((j) => j.lastBuild?.status === "success") &&
+              (s.files["Jenkinsfile"] || "").includes("nexa-web:1.0"),
+          },
+        ],
+        check: (s) =>
+          (s.files["Jenkinsfile"] || "").includes("docker build") &&
+          Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+        successMessage: "Container pipeline active! Docker image built, tagged, and ready for deployment.",
+      },
     ],
   },
   {
-    id: 9, title: "Build Automatically", role: "Automation Master", badge: "Automation Master",
-    story: "Developers are waiting for someone to click Build Now. Connect source changes to the pipeline.",
-    concepts: ["Webhooks start work immediately after a push.", "Branch rules prevent feature work from deploying to production."],
+    id: 9,
+    title: "Continuous Integration Trigger",
+    role: "Automation Master",
+    badge: "Automation Master",
+    story:
+      "Developers are tired of manually clicking 'Build Now'. Configure automated build triggers so git pushes automatically start verification.",
+    concepts: [
+      { heading: "Poll SCM", body: "Periodically querying source control for commits when webhooks cannot reach private workers." },
+      { heading: "Webhooks", body: "Immediate push notifications from Git repositories triggering instant builds." },
+    ],
+    setup: () =>
+      defaultJenkinsState({
+        files: {
+          Jenkinsfile: `pipeline {
+    agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    stages {
+        stage('Build') { steps { echo 'Triggered automatically!' } }
+    }
+}`,
+        },
+      }),
     missions: [
-      mission("j9m1", "Connect the webhook", "Commits can sit untested for hours.", "Enable the repository webhook trigger.", "Advanced", 300, ["enable-webhook"], ["Open Triggers for the pipeline.", "Prefer a push webhook over aggressive polling."], "Every push now starts validation automatically."),
-      mission("j9m2", "Protect deployment", "Feature branches can currently reach Deploy.", "Add the main-branch deployment condition and validate it.", "Advanced", 350, ["protect-main", "validate-jenkinsfile"], ["Build every branch, deploy only main.", "Use a stage condition rather than skipping the whole job."], "Feature branches are tested without being deployed."),
+      {
+        id: "j9",
+        title: "Continuous Integration Trigger",
+        scenario: "Automate build execution using Poll SCM triggers or webhook event listeners.",
+        problem: "Delayed test feedback occurs when developers forget to trigger builds manually.",
+        objective: "Configure a build trigger in Jenkins, trigger a build automatically, and verify the build cause.",
+        difficulty: "Advanced",
+        xp: 300,
+        hints: [
+          "In job configuration -> 'Build Triggers', select 'Poll SCM' (e.g. `H/5 * * * *`) or GitHub hook trigger.",
+          "In Declarative syntax, use `triggers { pollSCM('H/5 * * * *') }`.",
+          "Trigger a build and check the build cause shows automated polling.",
+        ],
+        suggested: ["cat Jenkinsfile", "curl http://localhost:8080/job/sample-job/api/json"],
+        checks: [
+          {
+            label: "Pipeline configuration defines automated build triggers",
+            test: (s) =>
+              (s.files["Jenkinsfile"] || "").includes("triggers") ||
+              (s.files["Jenkinsfile"] || "").includes("pollSCM") ||
+              Object.values(s.jobs).some((j) => (j.triggers?.length ?? 0) > 0),
+          },
+          {
+            label: "Automated trigger registered on the job",
+            test: (s) => true,
+          },
+          {
+            label: "Build executes successfully with trigger metadata",
+            test: (s) => Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+          },
+        ],
+        check: (s) =>
+          ((s.files["Jenkinsfile"] || "").includes("triggers") || (s.files["Jenkinsfile"] || "").includes("pollSCM")) &&
+          Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+        successMessage: "Continuous Integration automated! Builds now start automatically whenever code changes.",
+      },
     ],
   },
   {
-    id: 10, title: "Deploy It", role: "Deployment Engineer", badge: "Deployment Engineer",
-    story: "The pipeline is ready to deliver the Nexa web app into staging for the first time.",
-    concepts: ["Deployment stages should be explicit and observable.", "Artifacts link what was tested to what was released."],
-    missions: [
-      mission("j10m1", "Add deployment", "The pipeline stops after packaging.", "Enable Deploy and bind the staging environment.", "Advanced", 350, ["enable-deploy", "set-environment"], ["Deploy consumes the archived package.", "Target staging before production."], "The release path now reaches staging."),
-      mission("j10m2", "Release to staging", "The deployment stage is configured but unproven.", "Run the pipeline and verify the deployment result.", "Advanced", 400, ["run-build", "verify-deploy"], ["Run from the main branch.", "Verify the deployment after the stage succeeds."], "Nexa is live in staging from a traceable build."),
+    id: 10,
+    title: "The CI/CD Boss Mission",
+    role: "CI/CD Master",
+    badge: "CI/CD Master",
+    story:
+      "Final Boss Challenge! Construct a complete production-grade delivery pipeline from scratch: SCM Checkout, Compile, Automated Tests, Docker Packaging, and Artifact Archiving.",
+    concepts: [
+      { heading: "End-to-End Pipeline", body: "Orchestrating the complete software supply chain from raw commit to deployable artifact." },
+      { heading: "Archive Artifacts", body: "Storing build binaries, container digests, and test logs as permanent release assets." },
     ],
-  },
-  {
-    id: 11, title: "The Broken Deployment", role: "Incident Responder", badge: "Incident Responder",
-    story: "Production deployment failed after packaging succeeded. Diagnose the environment boundary and recover safely.",
-    concepts: ["Deployment failures need separate diagnosis from build failures.", "Recovery should preserve the audit trail."],
+    setup: () =>
+      defaultJenkinsState({
+        files: {
+          Jenkinsfile: `pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps { echo 'Cloning repository' }
+        }
+        stage('Build') {
+            steps { echo 'Compiling application' }
+        }
+        stage('Test') {
+            steps { echo 'Running automated test suite' }
+        }
+        stage('Docker') {
+            steps { echo 'Building and tagging container image' }
+        }
+        stage('Archive') {
+            steps { echo 'Archiving release artifact' }
+        }
+    }
+}`,
+        },
+      }),
     missions: [
-      mission("j11m1", "Triage production", "Deploy cannot authenticate to the production target.", "Inspect deployment output and credential binding.", "Advanced", 400, ["view-console", "inspect-deploy", "view-credentials"], ["The package is healthy; focus on Deploy.", "Compare the credential ID with the production binding."], "You isolated the incident to a credential mismatch."),
-      mission("j11m2", "Recover safely", "The job points at the staging credential during production delivery.", "Bind the production credential and rerun the failed pipeline.", "Advanced", 450, ["bind-production", "run-build"], ["Correct the binding without exposing the token.", "Create a new run so history remains intact."], "Production recovered with a complete audit trail."),
-    ],
-  },
-  {
-    id: 12, title: "Ship It", role: "Jenkins Engineer", badge: "Jenkins Engineer",
-    story: "Release v1.0.0 is ready. Operate the entire Nexa delivery system and prove you can ship with confidence.",
-    concepts: ["A release is the result of every guardrail working together.", "Operational confidence comes from observable, repeatable delivery."],
-    missions: [
-      mission("j12m1", "Release readiness", "The release candidate needs one final pipeline and security review.", "Validate the Jenkinsfile, credentials, trigger, and stage graph.", "Advanced", 500, ["validate-jenkinsfile", "view-credentials", "enable-webhook", "review-pipeline"], ["Review configuration before spending build time.", "Check both automation and secret handling."], "The release candidate passes operational review."),
-      mission("j12m2", "Ship Nexa v1.0.0", "Nexa is waiting for its first production release.", "Run the complete pipeline, verify production, and archive the release artifact.", "Advanced", 600, ["run-build", "verify-deploy", "archive-artifact"], ["Do not skip the final verification.", "The release artifact should remain attached to the successful build."], "You shipped Nexa v1.0.0. The factory is yours."),
+      {
+        id: "j10",
+        title: "The CI/CD Boss Mission",
+        scenario: "Build and execute an end-to-end 5-stage delivery pipeline passing all quality and packaging gates.",
+        problem: "The legacy release process is fragmented and slow. Unify all steps into one cohesive, automated pipeline.",
+        objective: "Execute a 5-stage pipeline (Checkout -> Build -> Test -> Docker -> Archive) and achieve a 100% green release build.",
+        difficulty: "Advanced",
+        xp: 500,
+        hints: [
+          "Check the Jenkinsfile in the Files editor.",
+          "Ensure stages: 'Checkout', 'Build', 'Test', 'Docker', and 'Archive' are defined.",
+          "Run the build and verify all 5 stages display green in Stage View.",
+        ],
+        suggested: ["cat Jenkinsfile", "jenkins-cli build full-pipeline", "curl http://localhost:8080/job/full-pipeline/wfapi/runs"],
+        checks: [
+          {
+            label: "Declarative pipeline with 5 core delivery stages",
+            test: (s) => {
+              const jf = s.files["Jenkinsfile"] || "";
+              return (
+                jf.includes("Checkout") &&
+                jf.includes("Build") &&
+                jf.includes("Test") &&
+                jf.includes("Docker") &&
+                jf.includes("Archive")
+              );
+            },
+          },
+          {
+            label: "All quality and packaging gates execute without error",
+            test: (s) => Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+          },
+          {
+            label: "Release artifact archived and certified for production",
+            test: (s) => Object.values(s.jobs).some((j) => j.lastBuild?.status === "success"),
+          },
+        ],
+        check: (s) => {
+          const jf = s.files["Jenkinsfile"] || "";
+          return (
+            jf.includes("Checkout") &&
+            jf.includes("Build") &&
+            jf.includes("Test") &&
+            jf.includes("Docker") &&
+            jf.includes("Archive") &&
+            Object.values(s.jobs).some((j) => j.lastBuild?.status === "success")
+          );
+        },
+        successMessage: "Boss defeated! You have constructed an enterprise-grade automated CI/CD pipeline. The factory is yours!",
+      },
     ],
   },
 ];
-
-export const JENKINS_RANKS = [
-  { xp: 0, name: "Pipeline Recruit" }, { xp: 500, name: "Build Engineer" },
-  { xp: 1200, name: "Test Runner" }, { xp: 2000, name: "Pipeline Architect" },
-  { xp: 3000, name: "Automation Engineer" }, { xp: 4200, name: "Pipeline Fixer" },
-  { xp: 5600, name: "Agent Commander" }, { xp: 7200, name: "Pipeline Guardian" },
-  { xp: 9000, name: "Automation Master" }, { xp: 11000, name: "Deployment Engineer" },
-  { xp: 13500, name: "Incident Responder" }, { xp: 16500, name: "Jenkins Engineer" },
-];
-
-export function rankForJenkins(xp: number) {
-  let current = JENKINS_RANKS[0];
-  let next: (typeof JENKINS_RANKS)[number] | null = null;
-  for (const rank of JENKINS_RANKS) {
-    if (xp >= rank.xp) current = rank;
-    else { next = rank; break; }
-  }
-  return { current, next };
-}
-
-export function jenkinsXpAfterHints(base: number, hintsUsed: number) {
-  return Math.round(base * [1, 0.8, 0.6][Math.min(hintsUsed, 2)]);
-}

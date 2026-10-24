@@ -9,9 +9,16 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
-import Learn from "./pages/Learn";
-import ToolPage from "./pages/ToolPage";
+import GitPath from "./pages/GitPath";
 import GitCourse from "./pages/GitCourse";
+import JenkinsPath from "./pages/JenkinsPath";
+import JenkinsLabPage from "./pages/JenkinsLabPage";
+import DockerPath from "./pages/DockerPath";
+import DockerLabPage from "./pages/DockerLabPage";
+import KubernetesPath from "./pages/KubernetesPath";
+import KubernetesLabPage from "./pages/KubernetesLabPage";
+import ProgressPage from "./pages/ProgressPage";
+import ToolPage from "./pages/ToolPage";
 import BugCreate from "./pages/BugCreate";
 import BugDetail from "./pages/BugDetail";
 import BugList from "./pages/BugList";
@@ -31,19 +38,45 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<Index />} />
-              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-              <Route path="/dashboard" element={<ProtectedRoute><Learn /></ProtectedRoute>} />
-              <Route path="/learn/git" element={<ProtectedRoute><GitCourse /></ProtectedRoute>} />
-              <Route path="/learn/:slug" element={<ProtectedRoute><ToolPage /></ProtectedRoute>} />
+              {/* Dashboard & Overview */}
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/progress" element={<ProgressPage />} />
 
-              <Route path="/overview" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              {/* 1. Git Workflow */}
+              <Route path="/learn/git" element={<GitPath />} />
+              <Route path="/learn/git/course" element={<GitCourse />} />
+              <Route path="/learn/git/lab/:levelId" element={<GitCourse />} />
+
+              {/* 2. Jenkins Factory */}
+              <Route path="/learn/jenkins" element={<JenkinsPath />} />
+              <Route path="/learn/jenkins/lab/:levelId" element={<JenkinsLabPage />} />
+
+              {/* 3. Docker Quest */}
+              <Route path="/learn/docker" element={<DockerPath />} />
+              <Route path="/learn/docker/:levelId" element={<DockerLabPage />} />
+              <Route path="/learn/docker/lab/:levelId" element={<DockerLabPage />} />
+
+              {/* 4. Kubernetes Kingdom */}
+              <Route path="/learn/kubernetes" element={<KubernetesPath />} />
+              <Route path="/learn/kubernetes/:levelId" element={<KubernetesLabPage />} />
+              <Route path="/learn/kubernetes/lab/:levelId" element={<KubernetesLabPage />} />
+
+              {/* Reference Documentation */}
+              <Route path="/learn/:slug" element={<ToolPage />} />
+
+              {/* Auth and Support */}
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+
+              {/* Secondary bugtracker routes */}
+              <Route path="/overview" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/bugs" element={<ProtectedRoute><BugList /></ProtectedRoute>} />
               <Route path="/bugs/new" element={<ProtectedRoute><BugCreate /></ProtectedRoute>} />
               <Route path="/bugs/:id" element={<ProtectedRoute><BugDetail /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

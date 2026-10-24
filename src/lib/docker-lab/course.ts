@@ -4,118 +4,458 @@ import { emptyDocker, type DockerState } from "./engine";
 const running = (s: DockerState, pred: (c: DockerState["containers"][number]) => boolean) =>
   s.containers.some((c) => c.status === "running" && pred(c));
 
-const API_DOCKERFILE_BROKEN = `FROM node:20-alpine
+const DOCKERFILE_LEVEL_2 = `FROM nginx:alpine
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]`;
+
+const HTML_LEVEL_2 = `<!DOCTYPE html>
+<html>
+<head><title>Nexa Container App</title></head>
+<body><h1>Nexa Container Cloud v1.0</h1></body>
+</html>`;
+
+const COMPOSE_LEVEL_6 = `services:
+  api:
+    image: nexa-api:1.0
+    ports: ["3000:3000"]
+# TODO: add a cache service using redis:7
+`;
+
+const MULTI_STAGE_DOCKERFILE = `# Stage 1: Build
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-EXPOSE 3000
-# TODO: tell the container how to start the app`;
+RUN npm run build
+
+# Stage 2: Production
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]`;
 
 export const dockerLevels: LabLevel<DockerState>[] = [
   {
-    id: 1, title: "Hello, Container", badge: "First Contact",
-    story: "Day one at Nexa. Your lead, Maya, says: \"Before you touch our services, prove Docker works on your sandbox.\"",
+    id: 1,
+    title: "The Container Recruit",
+    badge: "Container Recruit",
+    story:
+      '"The application works on my machine, but I have no way to run it anywhere else." Your first job at the company: get its web service running in a container, the same way on every machine, without installing anything on your own laptop.',
     concepts: [
-      { term: "Image", meaning: "A read-only template — the app plus everything it needs." },
-      { term: "Container", meaning: "A running (or stopped) instance of an image." },
-    ],
-    setup: () => emptyDocker(),
-    missions: [
-      { id: "d1-1", title: "Check the engine", objective: "Confirm Docker is installed by checking its version.", xp: 50,
-        hints: ["Every CLI has a version subcommand.", "Run `docker version`."], check: (s) => s.history.some((h) => /^docker (version|--version)/.test(h)) },
-      { id: "d1-2", title: "Run hello-world", objective: "Run the official hello-world image and confirm it created a container.", xp: 100,
-        hints: ["`docker run` pulls the image automatically if it's missing.", "Run `docker run hello-world`, then `docker ps -a`."], check: (s) => s.containers.some((c) => c.image.startsWith("hello-world")) },
-    ],
-  },
-  {
-    id: 2, title: "Serve the Homepage", badge: "Port Master",
-    story: "Marketing needs a quick preview of the landing page. Nginx is the fastest way to serve static files.",
-    concepts: [
-      { term: "-d", meaning: "Detached: run in the background." },
-      { term: "-p 8080:80", meaning: "Map host port 8080 to container port 80." },
-      { term: "--name", meaning: "Give the container a memorable name." },
-    ],
-    setup: () => emptyDocker(),
-    missions: [
-      { id: "d2-1", title: "Pull nginx", objective: "Download the nginx image so it's available locally.", xp: 60,
-        hints: ["Use docker pull.", "`docker pull nginx`"], check: (s) => s.images.some((i) => i.startsWith("nginx")) },
-      { id: "d2-2", title: "Publish it", objective: "Run nginx in the background, named `web`, reachable on host port 8080.", xp: 140,
-        hints: ["You need -d, --name and -p.", "`docker run -d --name web -p 8080:80 nginx`"],
-        check: (s) => running(s, (c) => c.name === "web" && c.image.startsWith("nginx") && c.ports.some((p) => p.startsWith("8080:80"))) },
-    ],
-  },
-  {
-    id: 3, title: "Container Lifecycle", badge: "Lifecycle Keeper",
-    story: "An old test container `legacy-cache` is eating memory on the shared host. Clean it up without touching `web`.",
-    concepts: [
-      { term: "docker stop", meaning: "Gracefully stops a running container." },
-      { term: "docker rm", meaning: "Deletes a stopped container." },
-      { term: "docker logs", meaning: "Shows a container's output." },
+      { term: "Image", meaning: "A read-only template containing the app and all runtime dependencies." },
+      { term: "Container", meaning: "A running or stopped isolated instance of an image." },
+      { term: "-p 8080:80", meaning: "Maps host port 8080 to container port 80." },
     ],
     setup: () => emptyDocker({
-      images: ["nginx:latest", "redis:7"],
-      containers: [
-        { id: "a1b2c3d4e5f6", name: "web", image: "nginx:latest", status: "running", ports: ["8080:80"], volumes: [], network: "bridge" },
-        { id: "f6e5d4c3b2a1", name: "legacy-cache", image: "redis:7", status: "running", ports: [], volumes: [], network: "bridge" },
-      ],
+      files: {
+        "README.md": "# Mission 01\nRun an Nginx web server inside a container named web-lab and publish port 8080.",
+      },
     }),
     missions: [
-      { id: "d3-1", title: "Read the logs", objective: "Check what the `web` container has been printing.", xp: 60,
-        hints: ["docker logs <name>", "`docker logs web`"], check: (s) => s.history.some((h) => /^docker logs web/.test(h)) },
-      { id: "d3-2", title: "Remove legacy-cache", objective: "Stop and remove `legacy-cache`, keeping `web` running.", xp: 140,
-        hints: ["A running container must be stopped before rm.", "`docker stop legacy-cache` then `docker rm legacy-cache`"],
-        check: (s) => !s.containers.some((c) => c.name === "legacy-cache") && running(s, (c) => c.name === "web") },
+      {
+        id: "d1",
+        title: "The Container Recruit",
+        objective: "Run an Nginx web server inside a container and prove it answers on port 8080.",
+        xp: 100,
+        briefing:
+          '"The application works on my machine, but I have no way to run it anywhere else." Your first job at the company: get its web service running in a container, the same way on every machine, without installing anything on your own laptop.',
+        hints: [
+          "Check existing images with `docker images`.",
+          "Run detached with `-d`, set name with `--name web-lab`, and map ports with `-p 8080:80`.",
+          "Run: `docker run -d --name web-lab -p 8080:80 nginx`",
+        ],
+        suggested: ["docker images", "docker run -d --name web-lab -p 8080:80 nginx", "curl localhost:8080"],
+        checks: [
+          {
+            label: "The nginx image is available on this host",
+            test: (s) => s.images.some((i) => i.startsWith("nginx")),
+          },
+          {
+            label: "A container named web-lab is running",
+            test: (s) => running(s, (c) => c.name === "web-lab"),
+          },
+          {
+            label: "It publishes host port 8080 to container port 80",
+            test: (s) =>
+              running(s, (c) => c.name === "web-lab" && c.ports.some((p) => p.startsWith("8080:80") || p.includes("8080:80"))),
+          },
+          {
+            label: "The application answers on port 8080",
+            test: (s) =>
+              running(s, (c) => c.name === "web-lab" && c.ports.some((p) => p.startsWith("8080:80") || p.includes("8080:80"))),
+          },
+        ],
+        check: (s) =>
+          s.images.some((i) => i.startsWith("nginx")) &&
+          running(s, (c) => c.name === "web-lab" && c.ports.some((p) => p.startsWith("8080:80") || p.includes("8080:80"))),
+      },
     ],
   },
   {
-    id: 4, title: "Build Your Own Image", badge: "Image Smith",
-    story: "The Nexa API needs to ship as an image. A teammate started the Dockerfile but the build keeps failing.",
+    id: 2,
+    title: "Image Architect",
+    badge: "Image Architect",
+    story: "Package your own web page into an image and run it from the image you built.",
     concepts: [
-      { term: "FROM", meaning: "The base image to start from." },
-      { term: "COPY / RUN", meaning: "Add files and run build steps (each creates a layer)." },
-      { term: "CMD", meaning: "The default command when the container starts." },
+      { term: "Dockerfile", meaning: "A declarative recipe for building container images layer by layer." },
+      { term: "docker build", meaning: "Compiles a Dockerfile into an immutable tagged image." },
     ],
-    setup: () => emptyDocker({ files: { Dockerfile: API_DOCKERFILE_BROKEN, "package.json": '{ "name": "nexa-api", "scripts": { "start": "node server.js" } }', "server.js": "require('http').createServer((q,r)=>r.end('ok')).listen(3000)" } }),
+    setup: () =>
+      emptyDocker({
+        files: {
+          Dockerfile: DOCKERFILE_LEVEL_2,
+          "index.html": HTML_LEVEL_2,
+        },
+      }),
     missions: [
-      { id: "d4-1", title: "Fix the Dockerfile", objective: "Open Dockerfile in the file panel and add a CMD that starts the app (npm start).", xp: 120,
-        hints: ["Look at the last line — it's only a comment.", 'Add `CMD ["npm", "start"]` at the end and save.'], check: (s) => /^CMD\s+/m.test(s.files["Dockerfile"] ?? "") },
-      { id: "d4-2", title: "Build and run", objective: "Build the image as `nexa-api:1.0` and run it detached on port 3000.", xp: 180,
-        hints: ["docker build -t <name:tag> .", "`docker build -t nexa-api:1.0 .` then `docker run -d -p 3000:3000 nexa-api:1.0`"],
-        check: (s) => s.images.includes("nexa-api:1.0") && running(s, (c) => c.image === "nexa-api:1.0" && c.ports.some((p) => p.endsWith(":3000"))) },
+      {
+        id: "d2",
+        title: "Image Architect",
+        objective: "Build an image named `my-web-app:1.0` from Dockerfile and start container `custom-web` on port 3000.",
+        xp: 150,
+        briefing:
+          "Pre-packaged images are great, but now it is time to build our company application. Create a custom image from the local Dockerfile and deploy it.",
+        hints: [
+          "Check the Dockerfile in the Files tab.",
+          "Build using `docker build -t my-web-app:1.0 .`",
+          "Run using `docker run -d --name custom-web -p 3000:80 my-web-app:1.0`",
+        ],
+        suggested: ["docker build -t my-web-app:1.0 .", "docker run -d --name custom-web -p 3000:80 my-web-app:1.0"],
+        checks: [
+          {
+            label: "Dockerfile has FROM and COPY instructions",
+            test: (s) => /^FROM\s+/m.test(s.files["Dockerfile"] || "") && /^COPY\s+/m.test(s.files["Dockerfile"] || ""),
+          },
+          {
+            label: "Image my-web-app:1.0 is built and listed",
+            test: (s) => s.images.some((i) => i.startsWith("my-web-app:1.0")),
+          },
+          {
+            label: "Container custom-web is running on port 3000",
+            test: (s) =>
+              running(s, (c) => c.name === "custom-web" && c.image.startsWith("my-web-app") && c.ports.some((p) => p.startsWith("3000:"))),
+          },
+        ],
+        check: (s) =>
+          s.images.some((i) => i.startsWith("my-web-app:1.0")) &&
+          running(s, (c) => c.name === "custom-web" && c.ports.some((p) => p.startsWith("3000:"))),
+      },
     ],
   },
   {
-    id: 5, title: "Data That Survives", badge: "Persistence Pro",
-    story: "QA lost their test database after a restart — again. Containers are disposable; data shouldn't be.",
+    id: 3,
+    title: "The Broken Container",
+    badge: "Troubleshooter",
+    story: "A crashing container is filling the logs. Diagnose the error using docker logs, fix the environment variable, and get it running.",
     concepts: [
-      { term: "Volume", meaning: "Docker-managed storage that outlives containers." },
-      { term: "-v name:/path", meaning: "Mount a volume into the container." },
+      { term: "docker logs", meaning: "Fetches stdout and stderr from a container for debugging." },
+      { term: "-e KEY=VALUE", meaning: "Injects runtime environment variables into the container." },
+    ],
+    setup: () =>
+      emptyDocker({
+        containers: [
+          {
+            id: "deadbeef0001",
+            name: "api-crasher",
+            image: "nexa-api:1.0",
+            status: "exited",
+            ports: [],
+            volumes: [],
+            network: "bridge",
+          },
+        ],
+      }),
+    missions: [
+      {
+        id: "d3",
+        title: "The Broken Container",
+        objective: "Diagnose why api-crasher failed, remove it, and restart it with `PORT=4000`.",
+        xp: 200,
+        briefing:
+          "Production alerted: `api-crasher` died immediately on startup. Read its logs, remove the dead container, and start a new one with the required environment variable.",
+        hints: [
+          "Run `docker logs api-crasher` to see the missing variable.",
+          "Stop and remove with `docker rm -f api-crasher`.",
+          "Start with `docker run -d --name api-crasher -e PORT=4000 -p 4000:4000 nexa-api:1.0`.",
+        ],
+        suggested: ["docker logs api-crasher", "docker rm -f api-crasher", "docker run -d --name api-crasher -e PORT=4000 -p 4000:4000 nexa-api:1.0"],
+        checks: [
+          {
+            label: "Inspect crash logs with docker logs",
+            test: (s) => s.history.some((h) => /^docker logs api-crasher/.test(h)),
+          },
+          {
+            label: "Remove the failing container",
+            test: (s) => !s.containers.some((c) => c.name === "api-crasher" && c.status === "exited"),
+          },
+          {
+            label: "Container api-crasher running with PORT=4000",
+            test: (s) =>
+              running(s, (c) => c.name === "api-crasher" && (c.env?.["PORT"] === "4000" || c.ports.some((p) => p.includes("4000")))),
+          },
+        ],
+        check: (s) =>
+          s.history.some((h) => /^docker logs api-crasher/.test(h)) &&
+          running(s, (c) => c.name === "api-crasher" && (c.env?.["PORT"] === "4000" || c.ports.some((p) => p.includes("4000")))),
+      },
+    ],
+  },
+  {
+    id: 4,
+    title: "The Data Guardian",
+    badge: "Volume Master",
+    story: "Containers are stateless and ephemeral, but databases must persist their data. Create and attach a persistent volume to a Postgres container.",
+    concepts: [
+      { term: "Docker Volume", meaning: "Managed storage outside container filesystem that survives restarts." },
+      { term: "-v vol:/path", meaning: "Mounts volume into specific directory inside container." },
     ],
     setup: () => emptyDocker({ images: ["postgres:16"] }),
     missions: [
-      { id: "d5-1", title: "Create a volume", objective: "Create a volume named `pgdata`.", xp: 80,
-        hints: ["docker volume …", "`docker volume create pgdata`"], check: (s) => s.volumes.includes("pgdata") },
-      { id: "d5-2", title: "Mount it", objective: "Run postgres detached, named `db`, with `pgdata` mounted at /var/lib/postgresql/data.", xp: 170,
-        hints: ["Combine -d, --name and -v.", "`docker run -d --name db -v pgdata:/var/lib/postgresql/data postgres:16`"],
-        check: (s) => running(s, (c) => c.name === "db" && c.volumes.some((v) => v.startsWith("pgdata:/var/lib/postgresql/data"))) },
+      {
+        id: "d4",
+        title: "The Data Guardian",
+        objective: "Create volume `pgdata` and run container `db` with `pgdata` mounted to `/var/lib/postgresql/data`.",
+        xp: 200,
+        briefing:
+          "QA lost their customer database after someone restarted the host. Ensure the database data lives on a named volume so containers can be replaced freely.",
+        hints: [
+          "Create volume: `docker volume create pgdata`.",
+          "Run container: `docker run -d --name db -v pgdata:/var/lib/postgresql/data postgres:16`.",
+        ],
+        suggested: ["docker volume create pgdata", "docker run -d --name db -v pgdata:/var/lib/postgresql/data postgres:16"],
+        checks: [
+          {
+            label: "Named volume pgdata is created",
+            test: (s) => s.volumes.includes("pgdata"),
+          },
+          {
+            label: "Postgres container db is running with pgdata mounted",
+            test: (s) =>
+              running(s, (c) => c.name === "db" && c.volumes.some((v) => v.startsWith("pgdata:/var/lib/postgresql/data"))),
+          },
+        ],
+        check: (s) =>
+          s.volumes.includes("pgdata") &&
+          running(s, (c) => c.name === "db" && c.volumes.some((v) => v.startsWith("pgdata:/var/lib/postgresql/data"))),
+      },
     ],
   },
   {
-    id: 6, title: "Multi-Container Apps", badge: "Composer",
-    story: "The API needs Redis. Starting each container by hand is error-prone — describe the whole stack in one file.",
+    id: 5,
+    title: "Network Operator",
+    badge: "Network Operator",
+    story: "Default bridge networks don't provide DNS name resolution between containers. Create an isolated custom bridge network and connect services.",
     concepts: [
-      { term: "User network", meaning: "Containers on the same network reach each other by name." },
-      { term: "Compose", meaning: "Declare services in compose.yaml and start them together." },
+      { term: "User-defined Bridge", meaning: "Provides automatic DNS resolution between containers by name." },
+      { term: "--network", meaning: "Attaches a container to a designated private network." },
     ],
-    setup: () => emptyDocker({ images: ["nexa-api:1.0", "redis:7"], registry: ["redis:7", "nexa-api:1.0", "nginx:latest"],
-      files: { "compose.yaml": "services:\n  api:\n    image: nexa-api:1.0\n    ports: [\"3000:3000\"]\n# TODO: add a cache service using redis:7\n" } }),
+    setup: () => emptyDocker({ images: ["redis:7", "nexa-api:1.0"] }),
     missions: [
-      { id: "d6-1", title: "Private network", objective: "Create a network named `nexa-net`.", xp: 80,
-        hints: ["docker network …", "`docker network create nexa-net`"], check: (s) => s.networks.includes("nexa-net") },
-      { id: "d6-2", title: "Compose the stack", objective: "Add a `cache` service (image redis:7) to compose.yaml and bring the stack up.", xp: 200,
-        hints: ["Indent like the api service: two spaces for the name, four for image.", "Add `  cache:\\n    image: redis:7`, save, then `docker compose up -d`."],
-        check: (s) => running(s, (c) => c.name === "nexa-api-1") && running(s, (c) => c.name === "nexa-cache-1" && c.image === "redis:7") },
+      {
+        id: "d5",
+        title: "Network Operator",
+        objective: "Create network `backend-net`, then start `cache` (redis:7) and `api` on `backend-net`.",
+        xp: 200,
+        briefing:
+          "The backend API needs to query Redis using the hostname `cache`. On the default bridge network, container DNS is disabled. Create an isolated network `backend-net`.",
+        hints: [
+          "Create the network: `docker network create backend-net`.",
+          "Start cache: `docker run -d --name cache --network backend-net redis:7`.",
+          "Start api: `docker run -d --name api --network backend-net -p 3000:3000 nexa-api:1.0`.",
+        ],
+        suggested: [
+          "docker network create backend-net",
+          "docker run -d --name cache --network backend-net redis:7",
+          "docker run -d --name api --network backend-net -p 3000:3000 nexa-api:1.0",
+        ],
+        checks: [
+          {
+            label: "Custom network backend-net is created",
+            test: (s) => s.networks.includes("backend-net"),
+          },
+          {
+            label: "Container cache is running on backend-net",
+            test: (s) => running(s, (c) => c.name === "cache" && c.network === "backend-net"),
+          },
+          {
+            label: "Container api is running on backend-net",
+            test: (s) => running(s, (c) => c.name === "api" && c.network === "backend-net"),
+          },
+        ],
+        check: (s) =>
+          s.networks.includes("backend-net") &&
+          running(s, (c) => c.name === "cache" && c.network === "backend-net") &&
+          running(s, (c) => c.name === "api" && c.network === "backend-net"),
+      },
+    ],
+  },
+  {
+    id: 6,
+    title: "Compose Commander",
+    badge: "Compose Commander",
+    story: "Managing multiple containers manually is tedious and error-prone. Use Docker Compose to declare both web and cache services in compose.yaml.",
+    concepts: [
+      { term: "compose.yaml", meaning: "Multi-container specification declaring services, networks, and volumes." },
+      { term: "docker compose up", meaning: "Creates and starts all services defined in the configuration file." },
+    ],
+    setup: () =>
+      emptyDocker({
+        files: { "compose.yaml": COMPOSE_LEVEL_6 },
+        images: ["nexa-api:1.0", "redis:7"],
+      }),
+    missions: [
+      {
+        id: "d6",
+        title: "Compose Commander",
+        objective: "Add a cache service (redis:7) to compose.yaml and bring the entire stack up with `docker compose up -d`.",
+        xp: 250,
+        briefing:
+          "Typing long docker run commands with flags in production leads to outages. Declare our complete microservice stack in compose.yaml and deploy with one command.",
+        hints: [
+          "Open compose.yaml in the Files tab.",
+          "Add `  cache:\\n    image: redis:7` under services, then click Save.",
+          "Run `docker compose up -d`.",
+        ],
+        suggested: ["cat compose.yaml", "docker compose up -d", "docker ps"],
+        checks: [
+          {
+            label: "compose.yaml defines both api and cache services",
+            test: (s) => /cache:/m.test(s.files["compose.yaml"] || ""),
+          },
+          {
+            label: "Multi-container stack brought up with docker compose",
+            test: (s) =>
+              running(s, (c) => c.name.includes("api")) && running(s, (c) => c.name.includes("cache")),
+          },
+        ],
+        check: (s) =>
+          /cache:/m.test(s.files["compose.yaml"] || "") &&
+          running(s, (c) => c.name.includes("api")) &&
+          running(s, (c) => c.name.includes("cache")),
+      },
+    ],
+  },
+  {
+    id: 7,
+    title: "The Deployment Boss",
+    badge: "Deployment Boss",
+    story: "Boss battle! Multi-tier production architecture with frontend, backend, database volume, and isolated networks. Bring down the monolith and bring up the full microservices stack.",
+    concepts: [
+      { term: "Microservices", meaning: "Decoupled specialized services interacting over private networks." },
+      { term: "Graceful Shutdown", meaning: "Stopping legacy workloads cleanly before cutover." },
+    ],
+    setup: () =>
+      emptyDocker({
+        containers: [
+          {
+            id: "mono0001dead",
+            name: "monolith",
+            image: "legacy-monolith:0.9",
+            status: "running",
+            ports: ["80:80"],
+            volumes: [],
+            network: "bridge",
+          },
+        ],
+        files: {
+          "compose.yaml": `services:
+  frontend:
+    image: nginx:alpine
+    ports: ["80:80"]
+  backend:
+    image: nexa-api:1.0
+    ports: ["3000:3000"]
+  db:
+    image: postgres:16
+`,
+        },
+      }),
+    missions: [
+      {
+        id: "d7",
+        title: "The Deployment Boss",
+        objective: "Stop the legacy monolith container, then deploy the 3-tier microservices stack with compose.",
+        xp: 500,
+        briefing:
+          "The migration cutover window is now open. Stop the legacy monolith holding port 80, then bring up the production compose stack with frontend, backend, and db.",
+        hints: [
+          "Stop monolith: `docker stop monolith && docker rm monolith`.",
+          "Bring up new stack: `docker compose up -d`.",
+          "Check running services with `docker ps`.",
+        ],
+        suggested: ["docker stop monolith", "docker compose up -d", "docker ps"],
+        checks: [
+          {
+            label: "Stop the legacy monolith container",
+            test: (s) => !running(s, (c) => c.name === "monolith"),
+          },
+          {
+            label: "Launch multi-service production stack with Docker Compose",
+            test: (s) =>
+              running(s, (c) => c.name.includes("frontend")) &&
+              running(s, (c) => c.name.includes("backend")),
+          },
+          {
+            label: "Verify all 3 containers are healthy and running",
+            test: (s) => s.containers.filter((c) => c.status === "running").length >= 3,
+          },
+        ],
+        check: (s) =>
+          !running(s, (c) => c.name === "monolith") &&
+          running(s, (c) => c.name.includes("frontend")) &&
+          running(s, (c) => c.name.includes("backend")),
+      },
+    ],
+  },
+  {
+    id: 8,
+    title: "Pipeline Architect",
+    badge: "Pipeline Architect",
+    story: "Automate Docker builds for cloud deployment. Tag and prepare a production-grade multi-stage container image for AWS ECR.",
+    concepts: [
+      { term: "Multi-stage Build", meaning: "Separates build dependencies from final minimal runtime image." },
+      { term: "AWS ECR Registry", meaning: "Amazon Elastic Container Registry repository URL format." },
+    ],
+    setup: () =>
+      emptyDocker({
+        files: {
+          Dockerfile: MULTI_STAGE_DOCKERFILE,
+          "package.json": '{"name":"nexa-web","scripts":{"build":"echo build"}}',
+        },
+      }),
+    missions: [
+      {
+        id: "d8",
+        title: "Pipeline Architect",
+        objective: "Build and tag a minimal multi-stage image for AWS ECR as `123456789012.dkr.ecr.us-east-1.amazonaws.com/nexa-web:v1`.",
+        xp: 220,
+        briefing:
+          "To deploy our containers on AWS ECS and EKS, images must be pushed to Amazon Elastic Container Registry (ECR). Build the multi-stage Dockerfile and tag it with the AWS ECR registry URI.",
+        hints: [
+          "Inspect the multi-stage Dockerfile in Files tab.",
+          "Build and tag with `docker build -t 123456789012.dkr.ecr.us-east-1.amazonaws.com/nexa-web:v1 .`",
+        ],
+        suggested: [
+          "cat Dockerfile",
+          "docker build -t 123456789012.dkr.ecr.us-east-1.amazonaws.com/nexa-web:v1 .",
+          "docker images",
+        ],
+        checks: [
+          {
+            label: "Multi-stage Dockerfile configured in sandbox files",
+            test: (s) => /AS builder/m.test(s.files["Dockerfile"] || ""),
+          },
+          {
+            label: "Build and tag image for AWS ECR: 123456789012.dkr.ecr.us-east-1.amazonaws.com/nexa-web:v1",
+            test: (s) =>
+              s.images.some((i) => i.includes("123456789012.dkr.ecr.us-east-1.amazonaws.com/nexa-web:v1")),
+          },
+        ],
+        check: (s) =>
+          s.images.some((i) => i.includes("123456789012.dkr.ecr.us-east-1.amazonaws.com/nexa-web:v1")),
+      },
     ],
   },
 ];
